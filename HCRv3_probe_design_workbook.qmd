@@ -1,0 +1,374 @@
+---
+title: "HCR probe design"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+## Environment
+
+```{r}
+library(tidyverse) # CRAN
+library(furrr) # CRAN
+library(patchwork) # CRAN
+library(valr) # CRAN
+library(rBLAST) # Github/Bioconductor
+
+Sys.which("blastn") # Check correct installation of BLAST
+n_threads <- 4
+plan(multisession, workers = n_threads) # Number of threads
+source("./src/HCR_design.R") # Contains functions
+
+# writeLines(capture.output(sessionInfo()), "./sessionInfo.txt")
+```
+
+## Prepare target RNA sequence
+
+Put N between exons to prevent probes spanning exon-intron junctions
+
+```{r}
+## Paste target RNA sequence
+target_raw <- "
+gattcattcgtttcgcgactttcgaactgtgaagttgtctctccggcgcg
+ttatctccgtcttggccaaaactcgtgactgatcgagagaagaagtctga
+aaccagctctgagcgagaagacaagtgtggagactgcagttcagcatccg
+cgtttgctgtgctcaagaaagaaacggcaatagttgtcttcggtttcttg
+gagacgtcttcgccgcgctctcaccctatttggagaagattgagatcttg
+gagcgcagctcttgagaaacactacatatattaaatcgcgcgcttgcagg
+gtgtggtgctaaaagtcaatttctaag
+ATGTGGCGGCCGAGTATCTCGAATTGCGTGTGGAGCACCCTGCTCCTGGC
+CATTTTTGTGCAGCAAACGCTAGCACAGCGAACCCCGACCATATCCTACA
+TCACGCAGGAGCAGATCAAGGATATCGGCGGCACAGTGGAGTTCGATTGC
+TCCGTCCAGTATGCCAAAGAGTACAACGTGCTGTTCCTGAAGACGGACAG
+CGATCCCGTCTTCCTCTCCACGGGCTCCACGCTGGTCATCAAGGATTCGC
+GCTTCTCGCTGCGGTACGATCCCAACTCGTCCACCTACAAGCTGCAGATC
+AAGGACATTCAGGAGACGGACGCGGGCACCTACACCTGCCAGGTGGTGAT
+CTCCACCGTTCACAAAGTGAGCGCCGAAGTGAAGCTATCGGTGCGCCGTC
+CCCCCGTCATCTCGGACAACTCCACGCAGTCGGTGGTGGCCAGCGAGGGC
+AGCGAGGTCCAGATGGAGTGCTACGCCAGCGGCTATCCCACACCCACCAT
+CACCTGGAGGCGCGAGAACAATGCCATTCTGCCAACTG
+N
+ATAGTGCCACCTATGTGGGCAACACCCTGCGCATCAAGTCAGTGAAGAAG
+GAGGATCGCGGCACCTACTACTGCGTGGCCGACAATGGAGTGAGCAAGGG
+CGACAGGCGCAATATCAACGTGGAGGTGGAGTTCGCACCAGTGATCACCG
+TGCCGCGTCCTCGTTTGGGACAGGCTCTGCAGTACGACATGGACTTGGAG
+TGCCACATTGAGGCCTATCCGCCACCGGCCATTGTGTGGACCAAGGACGA
+CATCCAGCTGGCCAACAACCAGCACTACAGCATCTCGCACTTCGCCACCG
+CCGACGAGTATACCGACTCGACGCTCCGTGTGATCACCGTTGAGAAGCGC
+CAGTACGGAGATTATGTGTGCAAGGCCACCAATCGCTTTGGAGAGGCGGA
+GGCGCGCGTCAATCTCTTCGAGACGATCATTCCCGTGTGCCCACCGGCCT
+GTGGACAGGCGTACATCGCCGGAGCCGAGGATGTGTCCGCCACTTCGTTC
+GCTCTTGTGGGCATCCTGGCGGCGTTGCTCTTCGCCAGATAAgccaatgggcccacggccgtcgactccaagcgcttcaggtccaatccatc
+aaccagccctcgaatgcataaaacatatataaaatagatatatcgaaaac
+aaacatcgtgtaaccgcgcaatagatgtctcaaacgatttcggacacacc
+aacccacatccagttctcagttcgttttgtagcttctgcttccgtttccg
+tatagtccagcccaatttttgtacgtccaatattatgtcttaagttaagt
+atgataagtgaagggccaacgataactagactataatttattagcaccct
+agagccgaactcaaaccgaaattagactccagcccagccgtaaacgatgc
+atttcaccttgatcccgtccgttttgctttctgatctggcactgtatatg
+ttttaaatattttaatctaagcaagatacatcacaagcattccgattttg
+cttcgacaattgagaggatattttatttttatttaataataataaagtat
+tttcgttacgcaaacctatcagctcgacacactattccctaaataatatc
+tcaacccccataatcgaggcaaaatccatattcgaataaaaggcaacaaa
+agttgtgtacattattagctcataagcacaatgagaaattcttttgaata
+acaagacatttttacccaaatttttgtgtgggtgtgagtaaaatcaattt
+cgactttgtaacaaaaaaaaaaaaagacaaacgaaaaactaaaattaac"
+
+## Prepare target RNA sequence
+target <- clean_pasted_seq(target_raw)
+```
+
+## Extract candidate probes into a dataframe
+
+```{r}
+## Extract candidate probes into a dataframe
+target_name <- "lac"
+oligo_length <- 52
+candidate_probes <- generate_candidate_probes(target_seq   = target,
+                                              oligo_length = oligo_length)
+## Inspect
+inspect_probe_prep(candidate_probes)
+
+```
+
+## Annotate candidate probes for filtering metrics
+
+hairpin_dG, homodimer_dG 
+
+```{r}
+## Get thermodynamic parameters - RNA sequence as input!! (Using furrr package to speed up processing)
+candidate_probe_thermodynamics <- future_map(
+  candidate_probes$target_sequence, 
+  ~ calculate_thermodynamics(seq           = .x, 
+                             temperature   = 37,
+                             Na            = 0.3,
+                             oligo_conc    = 5e-5)
+)
+
+candidate_probe_thermodynamics_1st_half <- future_map(
+  map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = 1, end = nchar(.x)/2 - 1)),
+  ~ calculate_thermodynamics(seq         = .x,
+                             temperature = 37,
+                             Na          = 0.3,
+                             oligo_conc  = 5e-5)
+)
+
+candidate_probe_thermodynamics_2nd_half <- future_map(
+  map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = nchar(.x)/2 + 2, end = nchar(.x))),
+  ~ calculate_thermodynamics(seq         = .x,
+                             temperature = 37,
+                             Na          = 0.3,
+                             oligo_conc  = 5e-5)
+)
+
+
+## Annotate candidate sequences 
+candidate_probes_annotated <- annotate_probes(candidate_probes)
+
+```
+
+## Filter based on thermodynamics / base composition parameters 
+
+- Raj lab HCR (52nt)
+ - dG [-70, -50] https://journals.asm.org/doi/10.1128/mbio.03751-21 
+- Sakura-Spengler lab (25nt) 
+ - GC [37, 85]
+ - Tm [55, 77]
+- Oligostan 26-32nt
+ - dG -32
+ - GC [40, 60]
+ - Nucleotide composition rules
+
+```{r}
+## Generate exploratory plots
+c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
+```
+
+```{r}
+## Filter based on thermodynamic/nucleotide compositions
+target_dG <- -60
+target_dG_halves <- -32
+dG_range <- c(-75, -50)
+Tm_range <- c(10, 100)
+GC_range <- c(0.4, 0.7)
+pass_a_comp       <- FALSE
+pass_c_comp       <- FALSE
+pass_a_stack      <- TRUE
+pass_c_stack      <- TRUE
+pass_c_spec_stack <- TRUE
+
+candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
+
+## Inspect filtered probes
+plot_inspection(candidate_probes_filtered, "Tm")
+
+```
+
+
+## BLAST screen
+
+BLAST screen with short blastn mode.
+RMBLAST or Bowtie1? Instead of bowtie2?
+
+```{r}
+## Set up blast environment
+blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
+dmel_db <- blast(db = blast_file)
+
+## Get sequences of filtered candidate target_sequence 
+seqs <- DNAStringSet(candidate_probes_filtered$target_sequence)
+names(seqs) <- candidate_probes_filtered$unique_id
+
+## BLAST nucleotide
+blast_output <- run_blastn_short(db = dmel_db, seqs = seqs)
+
+blast_summary <- blast_output %>%
+  dplyr::select(qseqid, sseqid) %>%
+  distinct() %>%
+  group_by(qseqid) %>%
+  summarise(n_matches = n(),
+            matches = paste(sseqid, collapse = "; ")) %>%
+  ungroup()
+
+## Screen candidate probes
+max_blast_matches <- 1
+screened_ids <- blast_summary %>% 
+  filter(n_matches == max_blast_matches) %>% pull(qseqid)
+
+candidate_probes_screened <- candidate_probes_filtered %>%
+  filter(unique_id %in% screened_ids)
+
+## Inspect
+plot_inspection(candidate_probes_screened, "Tm")
+
+```
+
+## Merge intervals and distribute probes 
+
+```{r}
+## Get merge-able regions
+candidate_probes_screened <- mutate(candidate_probes_screened, chrom = "valr")
+merge_df <- bed_merge(candidate_probes_screened) %>%
+  mutate(region_length = end - start + 1)
+plot_inspection(candidate_probes_screened, "Tm") +
+  geom_linerange(data = merge_df, 
+      aes(x = "", ymin = start, ymax = end),
+      colour = "gray40", size = 2,
+      inherit.aes = FALSE)
+
+```
+
+## Distribute and select probes
+
+```{r}
+## Short regions: can only fit one within overlapping regions
+probes_short_regions <- get_probes_shortregions(candidate_probes_screened, merge_df)
+
+## Long regions: can fit > 1 within overlapping regions -> distribute and select minimum deviation from target Gibbs energy
+probes_long_distributed <- distribute_probes_longregions(
+  candidate_probes_screened = candidate_probes_screened,
+  merge_df = merge_df, 
+  probe_spacing = 3)
+
+### Example for fitting any many as possible
+probes_long_tokeep <- probes_long_distributed %>%
+  group_by(longregion_id) %>%
+  slice_max(n_fit) %>%
+  ungroup() %>%
+  pull(midpoint_index) %>%
+  paste(collapse = "|") %>%
+  str_split(pattern = "\\|") %>% pluck(1) %>% as.numeric()
+
+probes_long_regions <- candidate_probes_screened %>%
+  filter(centre_pos %in% probes_long_tokeep)
+  
+## Combine probes from short and long regions
+candidate_probes_final <- bind_rows(probes_short_regions, probes_long_regions)
+
+## Inspect
+plot_inspection(candidate_probes_final, "Tm") +
+  geom_linerange(data = merge_df, 
+      aes(x = "", ymin = start, ymax = end),
+      colour = "gray40", size = 2,
+      inherit.aes = FALSE)
+
+```
+
+## Attach HCR-B initiator sequences 
+
+Attach HCR B1/B2/B3/B4/B5 split initiator sequences to selected probe sequences (rev-com'ed)
+ - Initiator b is added 3' end of First half (5') sequence
+ - Initiator a is added 5' end of Second half (3') sequence
+
+```{r}
+# * * * * * CHOOSE HAIRPIN FOR MULTIPLEXING
+
+b_identifier <- "B1"
+
+# * * * * * Attach hairpin sequences and save 
+
+probe_details <- attach_hcr_initiatior(candidate_probes_final, b_identifier = b_identifier)
+probes <- get_final_probe_sequences(probe_details)
+
+```
+
+## Save probe sequences and some other outputs
+
+```{r}
+## Probe details
+write_csv(probe_details,  paste0("./output/", target_name, "_", "HCR", b_identifier, "_details.csv"))
+
+## Probe design parameters
+save_params(paste0("./output/", target_name, "_", "HCR", b_identifier, "_details.txt"))
+
+## Probe sequences
+write_csv(probes, paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.csv"))
+
+## Probe location plot
+plot_final_probes(probe_details, "Tm")
+ggsave(paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.pdf"), 
+       width = 7, height = 4)
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/usr/people/bioc1402/data/computational_projects/C2/2.25.fishprobe_design/dmel_200729/offtarget_filtering/Dmel
+[16:15] Mary Thompson
+/usr/people/bioc1402/miniconda3/envs/ribopop_probe_design
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

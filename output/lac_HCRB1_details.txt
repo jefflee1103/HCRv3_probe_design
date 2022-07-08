@@ -1,0 +1,20 @@
+creation_date	2022-07-08 13:28:18
+n_threads	4
+target_name	lac
+HCRv3_B_version	B1
+oligo_length	52
+HCR_probe_hybe_region_length	25 each
+total_probe_pairs_generated	11
+target_dG	-60
+target_dG_halves	-32
+dG_range	-75:-50
+Tm_range	10:100
+GC_range	0.4:0.7
+pass_a_comp	FALSE
+pass_c_comp	FALSE
+pass_a_stack	TRUE
+pass_c_stack	TRUE
+pass_c_spec_stack	TRUE
+max_blast_matches	1
+BLAST_db_used	~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa
+output_files	lac_HCRB1_details.csv lac_HCRB1_probes.csv lac_HCRB1_probes.pdf
