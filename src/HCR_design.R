@@ -246,6 +246,7 @@ filter_candidate_probes <- function(annotated_df){
 
 run_blastn_short <- function(db, seqs){
   col_names <- c('qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore')
+  tx2gene <- read_csv("./src/Dmel_tx2gene_ENSEMBL_v99.csv")
   predict(dmel_db, seqs, 
           BLAST_args = paste0("-task blastn-short ",
                               "-dust no ",
@@ -253,7 +254,35 @@ run_blastn_short <- function(db, seqs){
                               "-num_threads 4 ")) %>%
     setNames(col_names) %>%
     filter(bitscore > 32) %>%
-    filter(evalue < 50)
+    filter(evalue < 50) %>%
+    separate(col = sseqid, into = c("sseqid", "is_intron"), sep = "_") %>%
+    left_join(tx2gene, by = c("sseqid" = "tx_id")) %>%
+    dplyr::select(qseqid, sseqid, gene_id, gene_name, everything()) %>%
+    mutate(gene_id = if_else(str_detect(sseqid, "FBgn"), sseqid, gene_id))
+}
+
+
+summarise_blast_output <- function(blast_output, allowOverlapBreakRegion){
+  if(allowOverlapBreakRegion == TRUE){
+    blast_summary <- blast_output %>%
+      filter(!(length <= 17 & qstart < 25 & qend > 28)) %>%
+      dplyr::select(qseqid, gene_id) %>%
+      distinct() %>%
+      group_by(qseqid) %>%
+      summarise(n_matches = n(),
+                matches = paste(gene_id, collapse = "; ")) %>%
+      ungroup()
+    
+  } else if(allowOverlapBreakRegion == FALSE) {
+    blast_summary <- blast_output %>%
+      dplyr::select(qseqid, gene_id) %>%
+      distinct() %>%
+      group_by(qseqid) %>%
+      summarise(n_matches = n(),
+                matches = paste(gene_id, collapse = "; ")) %>%
+      ungroup()
+  }
+  
 }
 
 
@@ -368,6 +397,48 @@ distribute_probes_longregions <- function(candidate_probes_screened, merge_df, p
         dplyr::select(longregion_maxfit, everything())
     }, .id = "longregion_id"
   )
+}
+
+distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, probe_spacing){
+  
+  if(sum(merge_df$type) == 0) {
+    ## Short regions: can only fit one within overlapping regions
+    probes_short_regions <- get_probes_shortregions(candidate_probes_screened, merge_df)
+    
+    candidate_probes_final <- probes_short_regions
+    return(candidate_probes_final)
+    
+  } else if(sum(merge_df$type) > 0 ) {
+    ## Short regions: can only fit one within overlapping regions
+    probes_short_regions <- get_probes_shortregions(candidate_probes_screened, merge_df)
+    
+    ## Long regions: can fit > 1 within overlapping regions -> distribute and select minimum deviation from target Gibbs energy
+    probes_long_distributed <- distribute_probes_longregions(
+      candidate_probes_screened = candidate_probes_screened,
+      merge_df = merge_df, 
+      probe_spacing = probe_spacing)
+    
+    ### Example for fitting any many probes as possible
+    probes_long_tokeep <- probes_long_distributed %>%
+      group_by(longregion_id) %>%
+      slice_max(n_fit) %>%
+      ungroup() %>%
+      pull(midpoint_index) %>%
+      paste(collapse = "|") %>%
+      str_split(pattern = "\\|") %>% pluck(1) %>% as.numeric()
+    
+    probes_long_regions <- candidate_probes_screened %>%
+      filter(centre_pos %in% probes_long_tokeep)
+    
+    ## Combine probes from short and long regions
+    candidate_probes_final <- bind_rows(probes_short_regions, probes_long_regions)
+    return(candidate_probes_final)
+    
+  } else {
+    print("No probes found. Try again!")
+  }
+  
+  
 }
 
 attach_hcr_initiatior <- function(candidate_probes_final, b_identifier){
@@ -485,6 +556,7 @@ save_params <- function(output){
     HCRv3_B_version              = b_identifier,
     oligo_length                 = oligo_length,
     HCR_probe_hybe_region_length = paste0(oligo_length / 2 - 1, " each"),
+    probe_spacing                = probe_spacing,
     total_probe_pairs_generated  = nrow(candidate_probes_final),
     target_dG                    = target_dG,
     target_dG_halves             = target_dG_halves,
@@ -497,13 +569,16 @@ save_params <- function(output){
     pass_c_stack                 = TRUE,
     pass_c_spec_stack            = TRUE,
     max_blast_matches            = max_blast_matches,
+    allowOverlapBreakRegion      = TRUE,
     BLAST_db_used                = blast_file,
     output_files                 = paste(
       paste0(target_name, "_", "HCR", b_identifier, "_details.csv"),
       paste0(target_name, "_", "HCR", b_identifier, "_probes.csv"),
       paste0(target_name, "_", "HCR", b_identifier, "_probes.pdf"),
       collapse                   = ", "
-    )
+    ),
+    target_sequence_totla_length = target_sequence_total_length,
+    target_sequence_used         = target
   ) %>%
     mutate(across(everything(), as.character)) %>%
     pivot_longer(everything(), names_to = "parameter", values_to = "value") %>%
