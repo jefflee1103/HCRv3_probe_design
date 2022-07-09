@@ -5,90 +5,51 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{bash}
-<!-- conda create -n BLAST python=3.7 -->
-<!-- conda activate BLAST -->
-<!-- conda install -c bioconda blast -->
-
-<!-- cd /PATH/TO/FASTA/File -->
-
-<!-- makeblastdb -in Dmel_ens99_from-MK.fa -parse_seqids -title Dmel_ens99 -dbtype nucl -->
-
-```
-
-
-```{r}
-# Sys.setenv(PATH = paste(Sys.getenv("PATH"), "/opt/miniconda3/envs/BLAST/bin", sep = .Platform$path.sep))
-# Sys.getenv("PATH")
-
-```
-
-
 ## Environment
 
 ```{r}
-library(tidyverse) # CRAN
-library(furrr) # CRAN
-library(patchwork) # CRAN
-library(valr) # CRAN
+## ---- R packages 
+library(tidyverse) 
+library(furrr) 
+library(patchwork) 
+library(valr) 
 library(Biostrings) # Bioconductor
 library(rBLAST) # Github
 
-Sys.which("blastn") # Check correct installation of BLAST
+## ---- Load source functions
+source("./src/HCR_design.R")
+
+## ---- Add BLAST installation to path
+## The PATH edit only applies to this QMD. This code should be run each session.
+conda_blast_bin <- "/opt/miniconda3/envs/BLAST/bin" # find this dir
+Sys.setenv(PATH = paste(Sys.getenv("PATH"), conda_blast_bin, sep = .Platform$path.sep))
+Sys.getenv("PATH")
+Sys.which("blastn")
+
+## ---- Set up multi-threading to speed up some calculation
 n_threads <- 4
-plan(multisession, workers = n_threads) # Number of threads
-source("./src/HCR_design.R") # Contains functions
+plan(multisession, workers = n_threads) 
 
 ```
 
+
 ## Prepare target RNA sequence
 
-Put N between exons to prevent probes spanning exon-intron junctions
+This chunk will take a FASTA file as input. To prevent probe design across exon-intron junctions do either of the following:
+
+  (1) Put character N between exons in case of one single fasta entry; or
+  (2) Set each exon as separate fasta entry in a single fasta file. 
+  
+Alternatively, assign target sequence (character class) to 'target_raw'. 
 
 ```{r}
-## Paste target RNA sequence
-target_raw <- "ATTCACATCGGTGCAAGCGTTCCGCAATCTGCTCAAGGAGGTGGGCGATC
-TGGCGGGACAGCGCGAGGTGGTGTCCGAGTCCCTGCAGCTGCAGATCATT
-GCGGGAGTGACGCTTCTGTCCAAGACATTGCGCGAGGAACGCAAG N 
-AAATGCCTTAGCGATGGTGCCACCCTGCAGCAGAACCTCACCACACAGCT
-CTCCTCGCTGGACCGGGCCAAGCGGAACTACGAGAAGGCCTACCGTGACT
-CGGAGAAGGCGGTGGACAGCTATAAGCGGGCAGACATGGACCTCAATCTC
-AGCCGGGCCGAGGTGGAGCGCTACAAGAACGTGATGACGTCCAAGATCCA
-GCAGTCGGACGATGCGAAGAACGAGTACGCTAACCAGCTACAGAAGACGA
-ACAATCTGCAGCAGCAACACTACAGCATGCTGCTGCCCTCGGTCCTCAAT
-CGGCTGCAGGAGCTGGACGAGAAACGCACCCGTGGCTTCAGGGAGTTCAT
-TGTGGGAGCGGCGGATGTGGAGTCATCGGTGGCGCCAATCATAGCCCGCT
-GCATGGAGGGTATCGTGAAGGCCGGCGAGTCCATCAACGAAAAGGAGGAT
-ACCTTCAAAGTCATAGAAAG N 
-ATATCAATCTGGTTTCACGCCACCAAGGGACATACCCTTCGAGGATCTGT
-CCAAGTGCGATCCGGATTCCGTGCAGGACTCACACTACAGCAACTCGACA
-TCGAACCACCTGACCATTAGAGGCACGATGAGTGCCAACAAGCTGAAGAA
-ACGCGTGGGCATTTTTAACATATTCGGCAGCAATAAG N
-CAGTTCGGCAAGTCCCGAGAGTGGCCTTGGCACTTCGCACACATCCCTGC
-CAGGATCAGGACAGGGCAGCGCCAACGAAAACGCGATTGGCGAGGATACC
-TACTATGAAACGGAAGTGGAGACCCTTAATCCAGTGGGAAAATGTCGTGC
-CCTGTATCCATTTGAAG N
-CCTCCAGCGAGGGTAGCATACCCATGAGTGAGGGCGAGGAGCTGCAAGTG
-ATCGAGATCGACCAAGGAGACGGATGGACGCGGGTGCGGCGGGAGAACAA
-CTCCAATGGCTGGGACGAGGGCTTCGTGCCCACGAGTTACATCGAGATCA
-CGCTCTATGCTTAG N
-GATTAAGTTCATTTTCGGGGCGGGCAATCAGCCGGGCGGTTTTAAATGTT
-ACCTACTCAGCAAACTCTTGCGTATGATCGATTGATTTGTGTACTTTTGT
-CATAACTTTGCGTTCTGTCGGACAGCCATAACACACAAAACATAACATAA
-CAGACACAACACGCCTAACTTTCACACAACACTGTACATTTGACTTAAGC
-TAAGTTCGATTCATTTACCCTTCGTATGCTTTGTATATTTACTTTGATTT
-TAAACGTCATTGATCTTATGGTAGTGCAAGCTATATCATACTATAAATAC
-TATAGTCATATGCACCTACGAGCAGACCTCACCTAATTGTAAGCACCGCA
-ACGTTTCCCTCTTCACCACAACAATCATGATAACACCTATTTATATACAT
-ATATGGAAAAAGATTTATATGACACTTGAATACGTGAGAGCATGAAAAGG
-AAAACTTAAACTGAAACTTAAACTACAGCCGTTGGACATTAAAAGTAATC
-TTGTGAACACGTTCTCACGTGCAATCC
-"
-fasta_file <- "./input/hTMPRSS2-test.fa" # Each exon should be separate fasta records
-target_fasta <- readDNAStringSet(fasta_file)
-target_raw <- paste(target_fasta, collapse = "N") # Alternatively, paste sequence into target_raw directly
+## ---- Get target RNA sequence
+fasta_file <- "./input/Dmel_cip4-exon.fa" 
 
-## Prepare target RNA sequence
+target_fasta <- readDNAStringSet(fasta_file)
+target_raw <- paste(target_fasta, collapse = "N")
+
+## ---- Prepare target RNA sequence
 target <- clean_pasted_seq(target_raw)
 target_sequence_total_length <- nchar(target)
 
@@ -97,22 +58,23 @@ target_sequence_total_length <- nchar(target)
 ## Extract candidate probes into a dataframe
 
 ```{r}
-## Extract candidate probes into a dataframe
-target_name <- "hTMPRSS2-test"
+## ---- Extract candidate probes into a dataframe
+target_name <- "cip4-exon"
 oligo_length <- 52
+
 candidate_probes <- generate_candidate_probes(target_seq   = target,
                                               oligo_length = oligo_length)
-## Inspect
+## ---- Inspect
 inspect_probe_prep(candidate_probes)
 
 ```
 
 ## Annotate candidate probes for filtering metrics
 
-hairpin_dG, homodimer_dG 
+TODO: add hairpin_dG, homodimer_dG calculations as in MK's ribopop design?
 
 ```{r}
-## Get thermodynamic parameters - RNA sequence as input!! (Using furrr package to speed up processing)
+## ---- Get thermodynamic parameters
 candidate_probe_thermodynamics <- future_map(
   candidate_probes$target_sequence, 
   ~ calculate_thermodynamics(seq           = .x, 
@@ -138,7 +100,7 @@ candidate_probe_thermodynamics_2nd_half <- future_map(
 )
 
 
-## Annotate candidate sequences 
+## ---- Annotate candidate sequences 
 candidate_probes_annotated <- annotate_probes(candidate_probes)
 
 ```
@@ -156,12 +118,13 @@ candidate_probes_annotated <- annotate_probes(candidate_probes)
  - Nucleotide composition rules
 
 ```{r}
-## Generate exploratory plots
+## ---- Generate exploratory plots
 c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
+
 ```
 
 ```{r}
-## Filter based on thermodynamic/nucleotide compositions
+## ---- Filter based on thermodynamic/nucleotide compositions
 target_dG <- -60
 target_dG_halves <- -32
 dG_range <- c(-75, -50)
@@ -175,7 +138,7 @@ pass_c_spec_stack <- TRUE
 
 candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
 
-## Inspect filtered probes
+## ---- Inspect filtered probes
 plot_inspection(candidate_probes_filtered, "Tm")
 
 ```
@@ -187,30 +150,30 @@ BLAST screen with short blastn mode.
 RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
-## Params
+## ---- Set aarams
 blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
 tx2gene_csv <- "./src/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 max_blast_matches <- 1 # Number of BLAST hits
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
-## Set up blast environment
+## ---- Set up blast environment
 db <- blast(db = blast_file)
 
-## Get sequences of filtered candidate target_sequence 
+## ---- Get sequences of filtered candidate target_sequence 
 seqs <- DNAStringSet(candidate_probes_filtered$target_sequence)
 names(seqs) <- candidate_probes_filtered$unique_id
 
-## BLAST nucleotide
+## ---- BLAST nucleotide
 blast_output <- run_blastn_short(db, seqs, tx2gene_csv)
 blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion)
 
-## Screen candidate probes
+## ---- Screen candidate probes
 screened_ids <- blast_summary %>% 
   filter(n_matches <= max_blast_matches) %>% pull(qseqid)
 candidate_probes_screened <- candidate_probes_filtered %>%
   filter(unique_id %in% screened_ids)
 
-## Merge overlapping intervals and inspect  
+## ---- Merge overlapping intervals and inspect  
 candidate_probes_screened <- mutate(candidate_probes_screened, chrom = "valr")
 merge_df <- bed_merge(candidate_probes_screened) %>%
   mutate(region_length = end - start + 1) %>%
@@ -231,13 +194,13 @@ plot_inspection(candidate_probes_screened, "Tm") +
 ## Distribute and select probes
 
 ```{r}
-## Params
+## ---- Set params
 probe_spacing <- 3
 
-## Get final non-overlapping screened candidate probes 
+## ---- Get final non-overlapping screened candidate probes 
 candidate_probes_final <- distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing = 3)
 
-## Inspect
+## ---- Inspect
 plot_inspection(candidate_probes_final, "Tm") +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
@@ -253,11 +216,11 @@ Attach HCR B1/B2/B3/B4/B5 split initiator sequences to selected probe sequences 
  - Initiator a is added 5' end of Second half (3') sequence
 
 ```{r}
-# * * * * * CHOOSE HAIRPIN FOR MULTIPLEXING
+## ---- Choose hairpin for multiplexing
 
 b_identifier <- "B1"
 
-# * * * * * Attach hairpin sequences and save 
+## ---- Attach hairpin sequences and save 
 
 probe_details <- attach_hcr_initiatior(candidate_probes_final, b_identifier = b_identifier)
 probes <- get_final_probe_sequences(probe_details)
@@ -267,16 +230,16 @@ probes <- get_final_probe_sequences(probe_details)
 ## Save probe sequences and some other outputs
 
 ```{r}
-## Probe details
+## ---- Probe details
 write_csv(probe_details,  paste0("./output/", target_name, "_", "HCR", b_identifier, "_details.csv"))
 
-## Probe design parameters
-save_params(paste0("./output/", target_name, "_", "HCR", b_identifier, "_params.txt"))
-
-## Probe sequences
+## ---- Probe sequences
 write_csv(probes, paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.csv"))
 
-## Probe location plot
+## ---- Probe design parameters
+save_params(paste0("./output/", target_name, "_", "HCR", b_identifier, "_params.txt"))
+
+## ---- A plot showing plot distribution along target RNA sequence
 plot_final_probes(probe_details, "Tm")
 ggsave(paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.pdf"), 
        width = 7, height = 4)
