@@ -5,6 +5,25 @@ editor_options:
   chunk_output_type: console
 ---
 
+```{bash}
+<!-- conda create -n BLAST python=3.7 -->
+<!-- conda activate BLAST -->
+<!-- conda install -c bioconda blast -->
+
+<!-- cd /PATH/TO/FASTA/File -->
+
+<!-- makeblastdb -in Dmel_ens99_from-MK.fa -parse_seqids -title Dmel_ens99 -dbtype nucl -->
+
+```
+
+
+```{r}
+# Sys.setenv(PATH = paste(Sys.getenv("PATH"), "/opt/miniconda3/envs/BLAST/bin", sep = .Platform$path.sep))
+# Sys.getenv("PATH")
+
+```
+
+
 ## Environment
 
 ```{r}
@@ -12,7 +31,8 @@ library(tidyverse) # CRAN
 library(furrr) # CRAN
 library(patchwork) # CRAN
 library(valr) # CRAN
-library(rBLAST) # Github/Bioconductor
+library(Biostrings) # Bioconductor
+library(rBLAST) # Github
 
 Sys.which("blastn") # Check correct installation of BLAST
 n_threads <- 4
@@ -64,6 +84,9 @@ ATATGGAAAAAGATTTATATGACACTTGAATACGTGAGAGCATGAAAAGG
 AAAACTTAAACTGAAACTTAAACTACAGCCGTTGGACATTAAAAGTAATC
 TTGTGAACACGTTCTCACGTGCAATCC
 "
+fasta_file <- "./input/hTMPRSS2-test.fa" # Each exon should be separate fasta records
+target_fasta <- readDNAStringSet(fasta_file)
+target_raw <- paste(target_fasta, collapse = "N") # Alternatively, paste sequence into target_raw directly
 
 ## Prepare target RNA sequence
 target <- clean_pasted_seq(target_raw)
@@ -75,7 +98,7 @@ target_sequence_total_length <- nchar(target)
 
 ```{r}
 ## Extract candidate probes into a dataframe
-target_name <- "cip4"
+target_name <- "hTMPRSS2-test"
 oligo_length <- 52
 candidate_probes <- generate_candidate_probes(target_seq   = target,
                                               oligo_length = oligo_length)
@@ -141,14 +164,14 @@ c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
 ## Filter based on thermodynamic/nucleotide compositions
 target_dG <- -60
 target_dG_halves <- -32
-dG_range <- c(-80, -50)
+dG_range <- c(-75, -50)
 Tm_range <- c(10, 100)
 GC_range <- c(0.4, 0.7)
 pass_a_comp       <- FALSE
 pass_c_comp       <- FALSE
 pass_a_stack      <- TRUE
 pass_c_stack      <- TRUE
-pass_c_spec_stack <- FALSE
+pass_c_spec_stack <- TRUE
 
 candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
 
@@ -166,18 +189,19 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 ```{r}
 ## Params
 blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
+tx2gene_csv <- "./src/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 max_blast_matches <- 1 # Number of BLAST hits
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
 ## Set up blast environment
-dmel_db <- blast(db = blast_file)
+db <- blast(db = blast_file)
 
 ## Get sequences of filtered candidate target_sequence 
 seqs <- DNAStringSet(candidate_probes_filtered$target_sequence)
 names(seqs) <- candidate_probes_filtered$unique_id
 
 ## BLAST nucleotide
-blast_output <- run_blastn_short(db = dmel_db, seqs = seqs)
+blast_output <- run_blastn_short(db, seqs, tx2gene_csv)
 blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion)
 
 ## Screen candidate probes
@@ -207,7 +231,7 @@ plot_inspection(candidate_probes_screened, "Tm") +
 ## Distribute and select probes
 
 ```{r}
-## Parameters
+## Params
 probe_spacing <- 3
 
 ## Get final non-overlapping screened candidate probes 
@@ -270,6 +294,28 @@ ggsave(paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.pdf")
 
 
 
+```{r}
+install.packages("reticulate")
+
+library(reticulate)
+
+```
+
+
+```{bash, engine.opts = "-l"}
+conda activate BLAST
+blastn -h
+
+```
+
+
+
+
+
+
+
+
+
 
 
 
@@ -286,6 +332,7 @@ ggsave(paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.pdf")
 /usr/people/bioc1402/data/computational_projects/C2/2.25.fishprobe_design/dmel_200729/offtarget_filtering/Dmel
 [16:15] Mary Thompson
 /usr/people/bioc1402/miniconda3/envs/ribopop_probe_design
+
 
 
 

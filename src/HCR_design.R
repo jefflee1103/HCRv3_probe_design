@@ -43,7 +43,9 @@ inspect_probe_prep <- function(df){
     geom_linerange(position = position_dodge2(width = 0.75)) + 
     geom_hline(yintercept = as_tibble(str_locate_all(target, pattern = "N")[[1]]) %>% pull(start),
                colour = "gray60") + 
-    labs(title = "All sliding probes",
+    labs(title = paste0(target_name, 
+                        ": all sliding probes - ",
+                        target_sequence_total_length, " bp in length"),
          subtitle = "Junction-spanning probes removed (if any present)",
          x = "", y = "") + 
     coord_flip() + 
@@ -244,10 +246,10 @@ filter_candidate_probes <- function(annotated_df){
 }
 
 
-run_blastn_short <- function(db, seqs){
+run_blastn_short <- function(db, seqs, tx2gene_csv){
   col_names <- c('qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore')
-  tx2gene <- read_csv("./src/Dmel_tx2gene_ENSEMBL_v99.csv")
-  predict(dmel_db, seqs, 
+  tx2gene <- read_csv(tx2gene_csv)
+  predict(db, seqs, 
           BLAST_args = paste0("-task blastn-short ",
                               "-dust no ",
                               "-soft_masking false ",
@@ -577,7 +579,8 @@ save_params <- function(output){
       paste0(target_name, "_", "HCR", b_identifier, "_probes.pdf"),
       collapse                   = ", "
     ),
-    target_sequence_totla_length = target_sequence_total_length,
+    target_sequence_total_length = target_sequence_total_length,
+    input_fasta                  = fasta_file,
     target_sequence_used         = target
   ) %>%
     mutate(across(everything(), as.character)) %>%
