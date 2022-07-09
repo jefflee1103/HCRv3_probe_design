@@ -1,0 +1,379 @@
+---
+title: "HCR Probes Design"
+author: "Tim Fulton"
+date: "01/06/2018"
+output:
+  pdf_document:
+    keep_tex: yes
+  html_document: default
+---
+
+```{r set-options, echo=FALSE, cache=FALSE}
+options(width=80)
+knitr::opts_chunk$set(comment = "", warning = FALSE, message = FALSE, echo = TRUE, tidy = TRUE, size="small")
+
+```
+
+Use this script to make Version 3 HCR Probes. Follow the instructions within the code carefully. 
+
+##Paste the mRNA sequence from NCBI gene here. Make sure you do not delete the "" ##
+
+```{r}
+
+
+gene <- "CTGACCTGCACTGAAGGAGCAGAAACACCAGAGCATTGGACTTAACATTGGAATTAATCCAGTTCTGATG
+GAGACCTTGCGTTTGAACTGAAACACTTAGATACACCAGATTTAGATTATTTTCTGACATTTTCTTTTAG
+AGGACATCTTTAGAGAAGGCTAAATAATGCAGGCTATCAGAGACCTCAAGCACAATTTCAGCCTCCCTCC
+TCCTCCATCCATGCCCGGAGCCGGTGATTCCTACCATCAAGGCAATATCCGGATGACTCTGGAGGATCCC
+GAGCTGTGGAGATCCTTCCATGAGATCGGCACTGAGATGATCATCACCAAACCTGGCAGAAGGATGTTTC
+CACACTGCAAAATCAGCTTGTCTGGACTGGTGCCGTATGCAAAGTACATCTTACTGGTGGACATGGTACC
+AGAAGACGGTCTGAGATATAAGTGGAACAAGGATAAGTGGGAGGTTGCAGGTAAAGCTGAGCCCCAGCCG
+CCCTACAGGACGTACCTGCACCCGGACTCACCAGCGCCCGGCAGCCACTGGATGAAGCAGCCCGTATCCT
+TCCTCAAGCTGAAGCTCACCAATAACGCGCTGGACCAGCATGGACATATTATCCTTCATTCTATGCACCG
+CTACCATCCACGTTTCCACATTGTTCAGGCTGATGATCTGTACAGCGTCCGCTGGAGCGTCTTCCAAACC
+TTTACCTTCCCCGAGACCTCCTTTACTGCCGTCACTGCCTACCAGAACACTAAAATTACAAAGCTGAAAA
+TTGACCACAATCCCTTTGCCAAAGGATTTAGAGATGAGGGAACAAACTCTAAAAGGCGGGCAAACAGAAA
+TCTGCCTGATCCCGAGCGAGTTGCAAAGAAAATGTCGAAAGACTCTGAACATGGAAGCCCACAAGATGTC
+CAGCCGTCATCGTGTGAAGCTCTGGATGATGAGCATGCGGGCCGTAAAGAGCTGGAGGTGAAGGCTGAGC
+GATACTCCCCATGGGGCGGAGCTTGCGACCGGGACAGCGGACACGCTCTCCGTCCAGAGTCCCCACTGGG
+ATCAGACCATCGAGACGTGTACAGCTCCGAGCAGCTCGTTCCAGGACAGAACACATACCAGCCGTACAGA
+TTTCACGAATACGGCAAATCCCCGTCTCCATCTTCATCTTCCAGCGTTGGCGGCAGCAGTGCATGTGGCA
+GCGCGGGACGTCCCAGCTTTGAGTCCCGAGTCTTGGACGTGGCCACCGTGCCCGACACAGACAGCTCCAG
+CAAGCCCTCCTCCGCTCCAGAGTTCAGCCTCCCTCCGCATCCCTCTGCAGGACACCAGGAGTACGCTGGA
+GTGCTAAACATGGCCATCACCCAGGCCAAACCAGGCATGCTGGGAACTCATCCGCTTTACAGCCACTACA
+GCACAGAACAGTCTCTGGGGCAGTGGAGCGGGGCAGCAGCATCCCAATACCCGCCTCCACCTCCGCCCCA
+TCATCACCTTCCCACCGAATACAGCAGCCAAGCTGTCCATCATGGCTATCACCATGGAAACGTTGGCGAT
+TGGAGCCAGTATCCGCTTTTCTCATACTCGTGCTGGTGAGCCGGACACCGATTGAGAGACCATTTTGAGG
+ATGCTTATTTTTAATTTTCTGCACGATGAGGTCTGGATGGTTTTTCATGACCTGTAAAATGGCACACGAA
+GTCGCCCGGTACTGAGTGTACCAAAAGTGAACACAAACTGTGAGAGGACGCACTAACTACACTTGCAAGA
+AGTATCCTAATTTTCTGACTGAGTTTCTAGTCTAAATATTGATTAACTGTTAAATTAAATTGACAAGACA
+GAAATAAAAATGTTTTAGGAAATCATGAGTGAAAATTGAGAGTTTTTATTTAAAACTAGCTAAATATTTG
+GATAGTGGGGTAGTAAAATAATATAGTTTCACTTATTATTTAGAGTAAAAATATGCATTTAATTTAATCT
+TTTATCCATATTTAGATTTATGTTTTATTGTCAAAATAATCTGCCAGTGCAGATTTAAAAACAAAAAAGT
+ATTTCAATCTAATAACGTATTTTTATTATTATTTTTTATATAAATTATTATGTTATTATAGATAAATAAG
+AATAAATAATTATTAAAATAATTTAATTTATAATAAATAAATATTATGTTATTATAAGTTTAAAATTCAG
+TTTTTCCATATTTTAAAATGAAACGATATTAATTTACTAACACCACTGGCAGATTATTTTAGTTTTAAAT
+TAAAAACTCACTTATTTTCACTTGCTATTTCTGGACTTTCGTCTAAAAAAGTGCATGTTTGATTAAAAAA
+TTTATCGATATTTAGACTTAAAAACTCTCAAAAAATATAAAGAAAAATTAAAAGTAAAAAATGTGCTTAT
+TTTTTCATTATTATCAAATCACAAGGGGTTTTCCTTAAAACTATCAACAAAATAACTCCACTTAATTTCG
+CTTTTTATTTAGTGAAAAAAAAGCATTTTAATTTAAGATGTTATGGATACTTAGATTTATGTTTTTTTAT
+GTCAAAATCTGCCAGTGCAGTTTAAAAAATTAAAAAAAAAA"
+
+gene_bp_length = nchar(gene)
+
+```
+
+
+The string however contains the original formatting of the source; in order to remove all of that and make it a plain, continuous sequence, the spaces at the start or end of each line are trimmed:
+##Do not change this part##
+
+```{r, tidy=TRUE}
+library(stringr) # stringr is required for the "str_" functions
+gene <- str_trim(gene) # Removes spaces from start and end of line
+gene <- str_replace_all(gene, "\n", "") # Removes the placeholder that R introduces to highlight an end of line
+gene <- str_replace_all(gene, "\r", "") # Removes another placeholder that R introduces to highlight an end of line
+head(gene)
+```
+
+
+Now we continue onto generating all the continuous 25 bp-long sequences possible from the mRNA sequence. As we extract them from the sequence string, we'll store them in a dataframe:
+
+```{r}
+gene_AllProbes <- data.frame(sequence= NA , G= NA, C= NA, GC= NA, Tm=NA) # Creation of the dataframe with empty categories
+
+for(i in 1:gene_bp_length){ # This loops extracts 25bp long sequences that differ for 1 nucleotide from the start to the very end of the string
+  gene_AllProbes[i, 1] <- substr(gene, 0+i, 24+i)
+}
+
+###seq1 <- unlist(strsplit(gene_AllProbes[1, 1], split="")) #prova vettore
+###gene_AllProbes[1, 1] <-seq1
+
+```
+
+
+Now we can compute GC content and Tm for each sequence: 
+
+```{r}
+for(i in 1:gene_bp_length){
+  gene_AllProbes$G[i] <- str_count(gene_AllProbes$sequence[i], "G")  # Counts guanines in each sequence
+  gene_AllProbes$C[i] <- str_count(gene_AllProbes$sequence[i], "C")  # Counts citosines in each sequence
+  gene_AllProbes$GC[i] <- (gene_AllProbes$G[i] + gene_AllProbes$C[i]) * 4   # Assigns GC content to each sequence
+  gene_AllProbes$Tm[i] <- 64.9 + 41*(gene_AllProbes$G[i]+gene_AllProbes$C[i]-16.4)/50 # Tm calculation for each sequence 
+  #Tm= 64.9 +41*(yG+zC-16.4)/(wA+xT+yG+zC) 
+}
+
+head(gene_AllProbes)
+```
+
+
+Now that our dataframe is fully annotated, we can subset it to the sequences that show GC content between 37 and 85, and Tm between 55 and 77:
+
+```{r}
+library(plyr) # plyr needed for "subset" function
+gene_selection <- subset(gene_AllProbes, GC >37 & GC <85 & Tm>55 & Tm<77)
+head(gene_selection)
+length(gene_selection$sequence)
+```
+
+
+This list of filtered primers can now be exported:
+
+```{r}
+write.table(gene_selection$sequence, "geneProbesFiltered.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+##Find the Text File saved in the folder where you opened this R script from. This contains all the allowable probe sequences. Choose 5 pairs of sequences. Each pair should be seperated by 2 nucleotides. Paste them in pairs in the chunck below. Blast eqch sequence to check that it is specific to the mRNA of interest. ##
+
+```{r}
+gene_blast <- c("TTTAGAGGACATCTTTAGAGAAGGC", "AATAATGCAGGCTATCAGAGACCTC", 
+                "TGCCCGGAGCCGGTGATTCCTACCA", "AAGGCAATATCCGGATGACTCTGGA",
+                "TGAGCGATACTCCCCATGGGGCGGA", "TTGCGACCGGGACAGCGGACACGCT",
+                "GCAAGCCCTCCTCCGCTCCAGAGTT", "GCCTCCCTCCGCATCCCTCTGCAGG",
+                "TACTCGTGCTGGTGAGCCGGACACC", "TTGAGAGACCATTTTGAGGATGCTT")
+```
+
+Sequences are manually blasted to confirm that they are specific to the gene and not overlapping.
+
+Our sequences comply to both conditions and will be used to design the probes. Note that to obtain the sequence to fit into the HCR probe, these sequences must be complemented and reversed:
+
+#run and make no changes#
+
+```{r}
+### The following code creates the function to obtain the reverse complement of a given sequence 
+### Author Fabio Marroni (http://www.fabiomarroni.altervista.org/)
+###### Arguments:
+###### x:character vector, the DNA sequence.
+###### rev: logical. If TRUE, the function will return the reverse complemente, if FALSE, it will return the complementary sequence. ###### The default value is TRUE.
+###### Value: The complemented (and eventually reverse) sequence, as a character vector.
+rev.comp<-function(x,rev=TRUE)   
+{
+x<-toupper(x)
+y<-rep("N",nchar(x))
+xx<-unlist(strsplit(x,NULL))
+for (bbb in 1:nchar(x))
+    {
+        if(xx[bbb]=="A") y[bbb]<-"T"    
+        if(xx[bbb]=="C") y[bbb]<-"G"    
+        if(xx[bbb]=="G") y[bbb]<-"C"    
+        if(xx[bbb]=="T") y[bbb]<-"A"
+    }
+if(rev==FALSE) 
+    {
+    for(ccc in (1:nchar(x)))
+        {
+        if(ccc==1) yy<-y[ccc] else yy<-paste(yy,y[ccc],sep="")
+        }
+    }
+if(rev==T)
+    {
+    zz<-rep(NA,nchar(x))
+    for(ccc in (1:nchar(x)))
+        {
+        zz[ccc]<-y[nchar(x)+1-ccc]
+        if(ccc==1) yy<-zz[ccc] else yy<-paste(yy,zz[ccc],sep="")
+        }
+    }
+    return(yy)  
+}
+
+### End of "rev.comp" function
+
+gene_probes <-""
+for(i in 1:length(gene_blast)){
+  gene_probes[i] <- rev.comp(gene_blast[i])
+}
+gene_probes
+
+write.table(gene_probes, "geneProbesFINAL.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+You now need to add the initiator sequences and spacer sequences. These sequences must be added so they sit on the 2nt space between the two probes. ie, add the initiator to the end of probe 1 and the start of probe 2. 
+
+PROBE 1 - SPACER - INITIATOR - INITIATOR - SPACER - PROBE 2
+
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
+
+##The next part of the code saves many new text files. Each file contains a the completed probe with the correct hairpin initiator sequence attached. You can use this to order the sequences from Sigma at the minimum volume, desalted. Check the initiators are in the 2nt space between the probes before ordering.
+
+HCR AMPLIFIER = B1
+
+```{r}
+initiator_I1_a <- "gAggAgggCAgCAAACgg"
+initiator_I1_b <- "gAAgAgTCTTCCTTTACg"
+
+B1_spacera <- "AA"
+B1_spacerb <- "TA"
+
+initiator_sequence_odd = paste(initiator_I1_a, B1_spacera, sep ="")
+initiator_sequence_even = paste(B1_spacerb, initiator_I1_b, sep ="")
+
+gene_HCRProbes_B1 <- vector(mode="character", length=0)
+
+for (i in 1:length(gene_probes)){
+  #If the number is even... paste initiator sequence, spacer, then probe
+  if((i %% 2) != 0){
+    thingy <- paste0(casefold(initiator_sequence_odd, upper = FALSE), gene_probes[i])
+    print(thingy)
+    gene_HCRProbes_B1 <- append(gene_HCRProbes_B1, thingy)}
+  #If number is odd... paste probe sequence, spacer and initator  
+  else{
+      thingy <- paste0(gene_probes[i], casefold(initiator_sequence_even, upper = FALSE))
+      print(thingy)
+      gene_HCRProbes_B1 <- append(gene_HCRProbes_B1, thingy)
+    }
+  }
+
+write.table(gene_HCRProbes_B1, "gene_HCRProbes_B1.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
+
+HCR AMPLIFIER = B2
+
+```{r}
+
+initiator_I1_a <- "CCTCgTAAATCCTCATCA" 
+initiator_I1_b <- "ATCATCCAgTAAACCgCC"
+
+B2_spacer <- "AA"
+
+initiator_sequence_odd = paste(initiator_I1_a, B2_spacer, sep ="")
+initiator_sequence_even = paste(B2_spacer, initiator_I1_b, sep ="")
+
+gene_HCRProbes_B2 <- vector(mode="character", length=0)
+
+for (i in 1:length(gene_probes)){
+  #If the number is odd... paste initiator sequence, spacer, then probe
+  if((i %% 2) != 0){
+    thingy <- paste0(casefold(initiator_sequence_odd, upper = FALSE), gene_probes[i])
+    print(thingy)
+    gene_HCRProbes_B2 <- append(gene_HCRProbes_B2, thingy)}
+  #If number is odd... paste probe sequence, spacer and initator  
+  else{
+      thingy <- paste0(gene_probes[i], casefold(initiator_sequence_even, upper = FALSE))
+      print(thingy)
+      gene_HCRProbes_B2 <- append(gene_HCRProbes_B2, thingy)
+    }
+  }
+
+write.table(gene_HCRProbes_B2, "gene_HCRProbes_B2.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
+
+HCR AMPLIFIER = B3
+
+```{r}
+
+initiator_I1_a <- "gTCCCTgCCTCTATATCT" 
+initiator_I1_b <- "CCACTCAACTTTAACCCg"
+
+B3_spacer <- "TT"
+
+initiator_sequence_odd = paste(initiator_I1_a, B3_spacer, sep ="")
+initiator_sequence_even = paste(B3_spacer, initiator_I1_b, sep ="")
+
+gene_HCRProbes_B3 <- vector(mode="character", length=0)
+
+for (i in 1:length(gene_probes)){
+  #If the number is odd... paste initiator sequence, spacer, then probe
+  if((i %% 2) != 0){
+    thingy <- paste0(casefold(initiator_sequence_odd, upper = FALSE), gene_probes[i])
+    print(thingy)
+    gene_HCRProbes_B3 <- append(gene_HCRProbes_B3, thingy)}
+  #If number is odd... paste probe sequence, spacer and initator  
+  else{
+      thingy <- paste0(gene_probes[i], casefold(initiator_sequence_even, upper = FALSE))
+      print(thingy)
+      gene_HCRProbes_B3 <- append(gene_HCRProbes_B3, thingy)
+    }
+  }
+
+write.table(gene_HCRProbes_B3, "gene_HCRProbes_B3.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
+
+HCR AMPLIFIER = B4
+
+```{r}
+
+initiator_I1_a <- "CCTCAACCTACCTCCAAC" 
+initiator_I1_b <- "TCTCACCATATTCgCTTC"
+
+B4_spacera <- "AA"
+B4_spacerb <- "AT"
+
+initiator_sequence_odd = paste(initiator_I1_a, B4_spacera, sep ="")
+initiator_sequence_even = paste(B4_spacerb, initiator_I1_b, sep ="")
+
+gene_HCRProbes_B4 <- vector(mode="character", length=0)
+
+for (i in 1:length(gene_probes)){
+  #If the number is odd... paste initiator sequence, spacer, then probe
+  if((i %% 2) != 0){
+    thingy <- paste0(casefold(initiator_sequence_odd, upper = FALSE), gene_probes[i])
+    print(thingy)
+    gene_HCRProbes_B4 <- append(gene_HCRProbes_B4, thingy)}
+  #If number is odd... paste probe sequence, spacer and initator  
+  else{
+      thingy <- paste0(gene_probes[i], casefold(initiator_sequence_even, upper = FALSE))
+      print(thingy)
+      gene_HCRProbes_B4 <- append(gene_HCRProbes_B4, thingy)
+    }
+  }
+
+write.table(gene_HCRProbes_B4, "gene_HCRProbes_B4.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
+
+HCR AMPLIFIER = B5
+
+```{r}
+
+initiator_I1_a <- "CTCACTCCCAATCTCTAT" 
+initiator_I1_b <- "CTACCCTACAAATCCAAT"
+
+B5_spacer <- "AA"
+
+initiator_sequence_odd = paste(initiator_I1_a, B5_spacer, sep ="")
+initiator_sequence_even = paste(B5_spacer, initiator_I1_b, sep ="")
+
+gene_HCRProbes_B5 <- vector(mode="character", length=0)
+
+for (i in 1:length(gene_probes)){
+  #If the number is odd... paste initiator sequence, spacer, then probe
+  if((i %% 2) != 0){
+    thingy <- paste0(casefold(initiator_sequence_odd, upper = FALSE), gene_probes[i])
+    print(thingy)
+    gene_HCRProbes_B5 <- append(gene_HCRProbes_B5, thingy)}
+  #If number is odd... paste probe sequence, spacer and initator  
+  else{
+      thingy <- paste0(gene_probes[i], casefold(initiator_sequence_even, upper = FALSE))
+      print(thingy)
+      gene_HCRProbes_B5 <- append(gene_HCRProbes_B5, thingy)
+    }
+  }
+
+write.table(gene_HCRProbes_B5, "gene_HCRProbes_B5.txt", quote = FALSE, sep = "\t", row.names = FALSE)
+```
+
+
+###NOW SAVE THIS FILE IN THE LAB PROTOCOLS FOLDER AND GIVE IT THE GENE NAME SO WE KNOW HOW THE PROBES WERE MADE###
+
+
+
+
+
+###END###
