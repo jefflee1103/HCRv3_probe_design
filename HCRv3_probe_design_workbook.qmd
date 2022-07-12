@@ -44,7 +44,7 @@ Alternatively, assign target sequence (character class) to 'target_raw'.
 
 ```{r}
 ## ---- Get target RNA sequence
-fasta_file <- "./input/Dmel_cip4-exon.fa" 
+fasta_file <- "./input/Dmel_lac-exon.fa" 
 
 target_fasta <- readDNAStringSet(fasta_file)
 target_raw <- paste(target_fasta, collapse = "N")
@@ -59,11 +59,12 @@ target_sequence_total_length <- nchar(target)
 
 ```{r}
 ## ---- Extract candidate probes into a dataframe
-target_name <- "cip4-exon"
+target_name <- "lac-exon"
 oligo_length <- 52
 
 candidate_probes <- generate_candidate_probes(target_seq   = target,
                                               oligo_length = oligo_length)
+
 ## ---- Inspect
 inspect_probe_prep(candidate_probes)
 
@@ -150,9 +151,9 @@ BLAST screen with short blastn mode.
 RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
-## ---- Set aarams
+## ---- Set params
 blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
-tx2gene_csv <- "./src/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+tx2gene_csv <- "./data/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 max_blast_matches <- 1 # Number of BLAST hits
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 

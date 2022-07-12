@@ -350,23 +350,46 @@ test_distr_combn <- function(probe_midpoints, n_fit, probe_spacing){
   # Find sum of dG deviation (52nt) - choose minimum
   # Find sum of dG deviation of probe halves (25nt) - choose minimum next in case of ties
   
+  # combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
+  # future_map_dfr(combinations,
+  #         function(combination){
+  #           tibble(
+  #             midpoint_index = probe_midpoints[combination] %>% paste(collapse = "|"),
+  #             nearest_dist = probe_midpoints[combination] %>% dist() %>% min(),
+  #             sum_probe_dG_deviations = probe_dG_deviations[combination] %>% sum(),
+  #             sum_probe_dG_deviations_halves = probe_dG_deviations_halves[combination] %>% sum()
+  #           )
+  #         }) %>%
+  #   filter(nearest_dist >= 52 + probe_spacing) %>%
+  #   slice_min(sum_probe_dG_deviations) %>%
+  #   slice_min(sum_probe_dG_deviations_halves) %>%
+  #   slice_head(n = 1)
+  
   combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
-  map_dfr(combinations,
-          function(combination){
-            tibble(
-              midpoint_index = probe_midpoints[combination] %>% paste(collapse = "|"),
-              nearest_dist = probe_midpoints[combination] %>% dist() %>% min(),
-              sum_probe_dG_deviations = probe_dG_deviations[combination] %>% sum(),
-              sum_probe_dG_deviations_halves = probe_dG_deviations_halves[combination] %>% sum()
-            )
-          }) %>%
-    filter(nearest_dist >= 52 + probe_spacing) %>%
-    slice_min(sum_probe_dG_deviations) %>%
-    slice_min(sum_probe_dG_deviations_halves) %>%
-    arrange(midpoint_index) %>%
-    slice_head(n = 1)
-    
+  spread_out_lists <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
+  if(length(spread_out_lists) == 0) {
+    tibble(
+      midpoint_index = character(),
+      sum_probe_dG_deviations = numeric(),
+      sum_probe_dG_deviations_halves = numeric()
+    ) %>% return()
+  } else {
+    future_map_dfr(spread_out_lists,
+                   function(spread_out_list){
+                     tibble(
+                       midpoint_index = probe_midpoints[spread_out_list] %>% paste(collapse = "|"),
+                       sum_probe_dG_deviations = probe_dG_deviations[spread_out_list] %>% sum(),
+                       sum_probe_dG_deviations_halves = probe_dG_deviations_halves[spread_out_list] %>% sum()
+                     )
+                   }) %>%
+      slice_min(sum_probe_dG_deviations) %>%
+      slice_min(sum_probe_dG_deviations_halves) %>%
+      slice_head(n = 1)
+  }
 }
+
+
+
 
 distribute_probes_longregions <- function(candidate_probes_screened, merge_df, probe_spacing){
   merge_df_long <- merge_df %>%
