@@ -561,6 +561,105 @@ attach_hcr_initiatior <- function(candidate_probes_final, b_identifier){
 }
 
 
+attach_hcr_initiatior_standalone <- function(data, first_half_col, second_half_col, b_identifier, target_name){
+  # Mutate 1st/2nd split sequences
+  df <- data %>%
+    dplyr::rename("rev_comp_1st_half" = !!sym(first_half_col)) %>%
+    dplyr::rename("rev_comp_2nd_half" = !!sym(second_half_col)) %>%
+    mutate(rev_comp_1st_half = tolower(rev_comp_1st_half)) %>%
+    mutate(rev_comp_2nd_half = tolower(rev_comp_2nd_half)) %>%
+    mutate(rev_comp_1st_half_id = seq(from = 1, to = 2 * nrow(data) - 1, by = 2) %>% str_pad(2, pad = "0")) %>%
+    mutate(rev_comp_2nd_half_id = seq(from = 2, to = 2 * nrow(data), by = 2) %>% str_pad(2, pad = "0")) %>%
+    dplyr::select(rev_comp_1st_half_id, rev_comp_1st_half, rev_comp_2nd_half_id, rev_comp_2nd_half)
+  # Add split initiators depending on the "b_identifier" argument
+  if(b_identifier == "B1") {
+    initiator_I1_a <- "gAggAgggCAgCAAACgg"
+    initiator_I1_b <- "gAAgAgTCTTCCTTTACg"
+    B1_spacera     <- "AA"
+    B1_spacerb     <- "TA"
+    
+    attachToEndOf1stHalf <- paste0(B1_spacerb, initiator_I1_b)
+    attachToStartOf2ndHalf <- paste0(initiator_I1_a, B1_spacera)
+    
+    df %>%
+      mutate(rev_comp_1st_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_1st_half_id)) %>%
+      mutate(rev_comp_1st_half_B1 = paste0(rev_comp_1st_half, attachToEndOf1stHalf)) %>%
+      mutate(rev_comp_2nd_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_2nd_half_id)) %>%
+      mutate(rev_comp_2nd_half_B1 = paste0(attachToStartOf2ndHalf, rev_comp_2nd_half)) %>%
+      return()
+    
+  } else if(b_identifier == "B2") {
+    initiator_I2_a <- "CCTCgTAAATCCTCATCA"
+    initiator_I2_b <- "ATCATCCAgTAAACCgCC"
+    B2_spacera     <- "AA"
+    B2_spacerb     <- "AA"
+    
+    attachToEndOf1stHalf <- paste0(B2_spacerb, initiator_I2_b)
+    attachToStartOf2ndHalf <- paste0(initiator_I2_a, B2_spacera)
+    
+    df %>%
+      mutate(rev_comp_1st_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_1st_half_id)) %>%
+      mutate(rev_comp_1st_half_B1 = paste0(rev_comp_1st_half, attachToEndOf1stHalf)) %>%
+      mutate(rev_comp_2nd_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_2nd_half_id)) %>%
+      mutate(rev_comp_2nd_half_B1 = paste0(attachToStartOf2ndHalf, rev_comp_2nd_half)) %>%
+      return()
+    
+  } else if(b_identifier == "B3") {
+    initiator_I3_a <- "gTCCCTgCCTCTATATCT"
+    initiator_I3_b <- "CCACTCAACTTTAACCCg"
+    B3_spacera     <- "TT"
+    B3_spacerb     <- "TT"
+    
+    attachToEndOf1stHalf <- paste0(B3_spacerb, initiator_I3_b)
+    attachToStartOf2ndHalf <- paste0(initiator_I3_a, B3_spacera)
+    
+    df %>%
+      mutate(rev_comp_1st_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_1st_half_id)) %>%
+      mutate(rev_comp_1st_half_B1 = paste0(rev_comp_1st_half, attachToEndOf1stHalf)) %>%
+      mutate(rev_comp_2nd_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_2nd_half_id)) %>%
+      mutate(rev_comp_2nd_half_B1 = paste0(attachToStartOf2ndHalf, rev_comp_2nd_half)) %>%
+      return()
+    
+  } else if(b_identifier == "B4") {
+    initiator_I4_a <- "CCTCAACCTACCTCCAAC"
+    initiator_I4_b <- "TCTCACCATATTCgCTTC"
+    B4_spacera     <- "AA"
+    B4_spacerb     <- "AT"
+    
+    attachToEndOf1stHalf <- paste0(B4_spacerb, initiator_I4_b)
+    attachToStartOf2ndHalf <- paste0(initiator_I4_a, B4_spacera)
+    
+    df %>%
+      mutate(rev_comp_1st_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_1st_half_id)) %>%
+      mutate(rev_comp_1st_half_B1 = paste0(rev_comp_1st_half, attachToEndOf1stHalf)) %>%
+      mutate(rev_comp_2nd_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_2nd_half_id)) %>%
+      mutate(rev_comp_2nd_half_B1 = paste0(attachToStartOf2ndHalf, rev_comp_2nd_half)) %>%
+      return()
+    
+  } else if(b_identifier == "B5") {
+    initiator_I5_a <- "CTCACTCCCAATCTCTAT"
+    initiator_I5_b <- "CTACCCTACAAATCCAAT"
+    B5_spacera     <- "AA"
+    B5_spacerb     <- "AA"
+    
+    attachToEndOf1stHalf <- paste0(B5_spacerb, initiator_I5_b)
+    attachToStartOf2ndHalf <- paste0(initiator_I5_a, B5_spacera)
+    
+    df %>%
+      mutate(rev_comp_1st_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_1st_half_id)) %>%
+      mutate(rev_comp_1st_half_B1 = paste0(rev_comp_1st_half, attachToEndOf1stHalf)) %>%
+      mutate(rev_comp_2nd_half_probe_id = paste0(target_name, "_HCR", b_identifier, "_", rev_comp_2nd_half_id)) %>%
+      mutate(rev_comp_2nd_half_B1 = paste0(attachToStartOf2ndHalf, rev_comp_2nd_half)) %>%
+      return()
+    
+  } else {
+    print("Please select one of B1, B2, B3, B4, or B5 hairpin identifiers")
+    
+  }
+}
+
+
+
 get_final_probe_sequences <- function(probe_details){
   first <- probe_details %>%
     dplyr::select(contains("rev_comp_1st_half")) %>%
