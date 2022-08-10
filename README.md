@@ -14,27 +14,28 @@ It is recommended to use conda environment for BLAST installation. Make sure to 
 
 Create conda environment for BLAST.
 
-    conda activate -n BLAST python=3.7
+    conda create -n BLAST python=3.7
     conda activate BLAST
     conda install -c bioconda blast
     blastn -h  # check installation
 
-Download BLAST database fasta (from MK) and copy to a desired directory and build a database.
+Download/Get BLAST database fasta (from MK) and copy to a desired directory and build a database.
 
     conda activate BLAST
     makeblastdb -in /path/to/fasta -parse_seqids -title Dmel_ens99 -dbtype nucl
 
 ### Install rBLAST (R wrapper for BLAST)
 
-Install `rBLAST` (https://github.com/mhahsler/rBLAST) and `Biostrings` in `R`.
+Install `rBLAST` (https://github.com/mhahsler/rBLAST) and `Biostrings` in `R`. Make sure your Mac has XCode installed in order to install `devtools`.
 
     install.packages("devtools")
     devtools::install_bioc("Biostrings")
+    devtools::install_bioc("rtracklayer")
     devtools::install_github("mhahsler/rBLAST")
 
 ### Add PATH to BLAST in R System
 
-Conda-installed binaries are not found in `R` by default. To append the BLAST PATH in R system, find the installed `BLAST` binary. On macos, it should be under `opt/miniconda3/envs/BLAST/bin`
+Conda-installed binaries are not found in `R` by default. To append the BLAST PATH in R system, find the installed `BLAST` binary. On macos, it should be under `opt/miniconda3/envs/BLAST/bin`.
 
     Sys.getenv("PATH") # the current PATH searched in R
     Sys.setenv(PATH = paste(Sys.getenv("PATH"), "/opt/miniconda3/envs/BLAST/bin", sep = .Platform$path.sep))
