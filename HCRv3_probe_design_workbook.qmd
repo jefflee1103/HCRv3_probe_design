@@ -5,7 +5,13 @@ editor_options:
   chunk_output_type: console
 ---
 
+## Update
+
+Modified: 2022.09.20
+
 ## Environment
+
+Requires installation of blastn using conda (see README.md).
 
 ```{r}
 ## ---- R packages 
@@ -16,12 +22,12 @@ library(valr)
 library(Biostrings) # Bioconductor
 library(rBLAST) # Github
 
-## ---- Load source functions
+## ---- Load functions
 source("./src/HCR_design.R")
 
-## ---- Add BLAST installation to path
-## The PATH edit only applies to this QMD. This code should be run each session.
-conda_blast_bin <- "/opt/miniconda3/envs/BLAST/bin" # find this dir
+## ---- Add BLAST installation to PATH
+## The PATH edit only temporarily applies to this QMD, so this code should be run each session.
+conda_blast_bin <- "/opt/miniconda3/envs/BLAST/bin" # find this directory
 Sys.setenv(PATH = paste(Sys.getenv("PATH"), conda_blast_bin, sep = .Platform$path.sep))
 Sys.getenv("PATH")
 Sys.which("blastn")
@@ -33,7 +39,7 @@ plan(multisession, workers = n_threads)
 ```
 
 
-## Prepare target RNA sequence
+## Prepare tiled candidate probes from the target RNA sequence 
 
 This chunk will take a FASTA file as input. To prevent probe design across exon-intron junctions do either of the following:
 
@@ -43,9 +49,11 @@ This chunk will take a FASTA file as input. To prevent probe design across exon-
 Alternatively, assign target sequence (character class) to 'target_raw'. 
 
 ```{r}
-## ---- Get target RNA sequence
+## ---- Input FASTA and name
 fasta_file <- "./input/Dmel_cip4-exon.fa" 
+target_name <- "cip4-exon"
 
+## ---- Get target RNA sequence
 target_fasta <- readDNAStringSet(fasta_file)
 target_raw <- paste(target_fasta, collapse = "N")
 
@@ -53,55 +61,30 @@ target_raw <- paste(target_fasta, collapse = "N")
 target <- clean_pasted_seq(target_raw)
 target_sequence_total_length <- nchar(target)
 
-```
-
-## Extract candidate probes into a dataframe
-
-```{r}
 ## ---- Extract candidate probes into a dataframe
-target_name <- "cip4-exon"
-oligo_length <- 52
-
 candidate_probes <- generate_candidate_probes(target_seq   = target,
-                                              oligo_length = oligo_length)
+                                              oligo_length = 52)
 ## ---- Inspect
 inspect_probe_prep(candidate_probes)
 
 ```
 
-## Annotate candidate probes for filtering metrics
+
+## Calculate thermodynamic and sequence composition parameters for candidate probes 
 
 TODO: add hairpin_dG, homodimer_dG calculations as in MK's ribopop design?
 
 ```{r}
+## ---- Set the hybridisation condition
+temperature <- 37
+Na <- 0.3
+oligo_conc <- 5e-5
+
 ## ---- Get thermodynamic parameters
-candidate_probe_thermodynamics <- future_map(
-  candidate_probes$target_sequence, 
-  ~ calculate_thermodynamics(seq           = .x, 
-                             temperature   = 37,
-                             Na            = 0.3,
-                             oligo_conc    = 5e-5)
-)
-
-candidate_probe_thermodynamics_1st_half <- future_map(
-  map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = 1, end = nchar(.x)/2 - 1)),
-  ~ calculate_thermodynamics(seq         = .x,
-                             temperature = 37,
-                             Na          = 0.3,
-                             oligo_conc  = 5e-5)
-)
-
-candidate_probe_thermodynamics_2nd_half <- future_map(
-  map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = nchar(.x)/2 + 2, end = nchar(.x))),
-  ~ calculate_thermodynamics(seq         = .x,
-                             temperature = 37,
-                             Na          = 0.3,
-                             oligo_conc  = 5e-5)
-)
-
+thermodynamics <- get_thermodynamic_parameters(candidate_probes, temperature, Na, oligo_conc)
 
 ## ---- Annotate candidate sequences 
-candidate_probes_annotated <- annotate_probes(candidate_probes)
+candidate_probes_annotated <- annotate_probes(candidate_probes, thermodynamics)
 
 ```
 
@@ -124,7 +107,7 @@ c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
 ```
 
 ```{r}
-## ---- Filter based on thermodynamic/nucleotide compositions
+## ---- Set filtering parameters
 target_dG <- -60
 target_dG_halves <- -32
 dG_range <- c(-75, -50)
@@ -136,6 +119,7 @@ pass_a_stack      <- TRUE
 pass_c_stack      <- TRUE
 pass_c_spec_stack <- TRUE
 
+## ---- Filter based on thermodynamic/nucleotide compositions
 candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
 
 ## ---- Inspect filtered probes
@@ -150,10 +134,10 @@ BLAST screen with short blastn mode.
 RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
-## ---- Set aarams
+## ---- Set params
 blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
-tx2gene_csv <- "./src/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
-max_blast_matches <- 1 # Number of BLAST hits
+tx2gene_csv <- "./data/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+max_blast_matches <- 1 # Max number of BLAST hits
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
 ## ---- Set up blast environment
@@ -168,21 +152,11 @@ blast_output <- run_blastn_short(db, seqs, tx2gene_csv)
 blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion)
 
 ## ---- Screen candidate probes
-screened_ids <- blast_summary %>% 
-  filter(n_matches <= max_blast_matches) %>% pull(qseqid)
-candidate_probes_screened <- candidate_probes_filtered %>%
-  filter(unique_id %in% screened_ids)
+blast_screened <- screen_with_blast_summary(candidate_probes_filtered, max_blast_matches, blast_summary)
+candidate_probes_screened <- blast_screened[[1]]
+merge_df <- blast_screened[[2]]
 
-## ---- Merge overlapping intervals and inspect  
-candidate_probes_screened <- mutate(candidate_probes_screened, chrom = "valr")
-merge_df <- bed_merge(candidate_probes_screened) %>%
-  mutate(region_length = end - start + 1) %>%
-  mutate(type = case_when(
-    region_length >= 2* oligo_length ~ 1,
-    region_length < 2 * oligo_length ~ 0,
-    TRUE ~ 0
-  ))
-
+## ---- Inspect BLAST screened probes
 plot_inspection(candidate_probes_screened, "Tm") +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
@@ -198,7 +172,7 @@ plot_inspection(candidate_probes_screened, "Tm") +
 probe_spacing <- 3
 
 ## ---- Get final non-overlapping screened candidate probes 
-candidate_probes_final <- distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing = 3)
+candidate_probes_final <- distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing)
 
 ## ---- Inspect
 plot_inspection(candidate_probes_final, "Tm") +
@@ -217,11 +191,9 @@ Attach HCR B1/B2/B3/B4/B5 split initiator sequences to selected probe sequences 
 
 ```{r}
 ## ---- Choose hairpin for multiplexing
-
 b_identifier <- "B1"
 
 ## ---- Attach hairpin sequences and save 
-
 probe_details <- attach_hcr_initiatior(candidate_probes_final, b_identifier = b_identifier)
 probes <- get_final_probe_sequences(probe_details)
 
@@ -230,46 +202,20 @@ probes <- get_final_probe_sequences(probe_details)
 ## Save probe sequences and some other outputs
 
 ```{r}
-## ---- Probe details
-write_csv(probe_details,  paste0("./output/", target_name, "_", "HCR", b_identifier, "_details.csv"))
+## ---- Create output directory
+output_dir <- paste0("./output/", target_name, "_", "HCR", b_identifier, "/")
+if(!dir.exists(output_dir)){dir.create(output_dir)}
 
-## ---- Probe sequences
-write_csv(probes, paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.csv"))
-
-## ---- Probe design parameters
-save_params(paste0("./output/", target_name, "_", "HCR", b_identifier, "_params.txt"))
+## ---- Export outputs 
+export_outputs(output_dir, probe_details, probes, blast_output)
 
 ## ---- A plot showing plot distribution along target RNA sequence
 plot_final_probes(probe_details, "Tm")
-ggsave(paste0("./output/", target_name, "_", "HCR", b_identifier, "_probes.pdf"), 
+ggsave(paste0(output_dir, target_name, "_", "HCR", b_identifier, "_probes.pdf"), 
        width = 7, height = 4)
   
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-install.packages("reticulate")
-
-library(reticulate)
-
-```
-
-
-```{bash, engine.opts = "-l"}
-conda activate BLAST
-blastn -h
-
-```
 
 
 

@@ -2,7 +2,9 @@ library(tidyverse)
 library(furrr) 
 library(patchwork) 
 library(valr) 
+library(Biostrings)
 library(rBLAST)
+oligo_length <- 52
 
 clean_pasted_seq <- function(sequence){
   sequence %>%
@@ -18,7 +20,7 @@ clean_pasted_seq <- function(sequence){
 
 generate_candidate_probes <- function(target_seq, oligo_length){
   # Generate staggered sequences of probe candidates with fixed length
-  map_dfr(1:nchar(target_seq), ~ {
+  df <- map_dfr(1:nchar(target_seq), ~ {
     start <- .x
     end <- .x + (oligo_length - 1)
     sequence <- str_sub(target, start, end)
@@ -32,6 +34,12 @@ generate_candidate_probes <- function(target_seq, oligo_length){
     mutate(unique_id = paste0("id_", start)) %>%
     mutate(centre_pos = (start + end) / 2) %>%
     dplyr::select(unique_id, centre_pos, everything())
+  
+  if(nrow(df) == 0){
+    return(print("ERROR: Candidate probes could not be generated. Check your FASTA file!"))
+  } else {
+    return(df)
+  }
 }
 
 
@@ -93,6 +101,45 @@ calculate_thermodynamics <- function(seq, temperature, Na, oligo_conc){
 }
 
 calculate_thermodynamics_v <- Vectorize(calculate_thermodynamics)
+
+
+get_thermodynamic_parameters <- function(candidate_probes, temperature, Na, oligo_conc) {
+  candidate_probe_thermodynamics <- future_map(
+    candidate_probes$target_sequence,
+    ~ calculate_thermodynamics(
+      seq = .x,
+      temperature = temperature,
+      Na = Na,
+      oligo_conc = oligo_conc
+    )
+  )
+
+  candidate_probe_thermodynamics_1st_half <- future_map(
+    map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = 1, end = nchar(.x) / 2 - 1)),
+    ~ calculate_thermodynamics(
+      seq = .x,
+      temperature = temperature,
+      Na = Na,
+      oligo_conc = oligo_conc
+    )
+  )
+
+  candidate_probe_thermodynamics_2nd_half <- future_map(
+    map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = nchar(.x) / 2 + 2, end = nchar(.x))),
+    ~ calculate_thermodynamics(
+      seq = .x,
+      temperature = temperature,
+      Na = Na,
+      oligo_conc = oligo_conc
+    )
+  )
+
+  output <- list(candidate_probe_thermodynamics, candidate_probe_thermodynamics_1st_half, candidate_probe_thermodynamics_2nd_half) %>%
+    set_names(c("Full", "First", "Second"))
+
+  return(output)
+}
+
 
 passed_a_comp <- function(theProbeSeq){
   # tolower(theProbeSeq) -> theProbeSeq
@@ -168,7 +215,7 @@ passed_c_spec_stack <- function(theProbeSeq){
 } 
 
 
-annotate_probes <- function(candidate_probes){
+annotate_probes <- function(candidate_probes, thermodynamics){
   # Takes candidate_probes df and adds thermodynamic and nucleotide composition parameters
   
   candidate_probes %>%
@@ -178,12 +225,12 @@ annotate_probes <- function(candidate_probes){
       A_content  = str_count(target_sequence, pattern = "A") / length,
       C_content  = str_count(target_sequence, pattern = "C") / length
     ) %>%
-    bind_cols(dG = map_dbl(candidate_probe_thermodynamics, pluck("dG"))) %>%
-    bind_cols(Tm = map_dbl(candidate_probe_thermodynamics, pluck("Tm"))) %>%
-    bind_cols(dG_1st_half = map_dbl(candidate_probe_thermodynamics_1st_half, pluck("dG"))) %>%
-    bind_cols(Tm_1st_half = map_dbl(candidate_probe_thermodynamics_1st_half, pluck("Tm"))) %>%
-    bind_cols(dG_2nd_half = map_dbl(candidate_probe_thermodynamics_2nd_half, pluck("dG"))) %>%
-    bind_cols(Tm_2nd_half = map_dbl(candidate_probe_thermodynamics_2nd_half, pluck("Tm"))) %>%
+    bind_cols(dG = map_dbl(thermodynamics$Full, pluck("dG"))) %>%
+    bind_cols(Tm = map_dbl(thermodynamics$Full, pluck("Tm"))) %>%
+    bind_cols(dG_1st_half = map_dbl(thermodynamics$First, pluck("dG"))) %>%
+    bind_cols(Tm_1st_half = map_dbl(thermodynamics$First, pluck("Tm"))) %>%
+    bind_cols(dG_2nd_half = map_dbl(thermodynamics$Second, pluck("dG"))) %>%
+    bind_cols(Tm_2nd_half = map_dbl(thermodynamics$Second, pluck("Tm"))) %>%
     mutate(
       passed_a_comp       = passed_a_comp(rev_comp),
       passed_c_comp       = passed_c_comp(rev_comp),
@@ -242,7 +289,13 @@ filter_candidate_probes <- function(annotated_df){
   filt_df <- filt_df %>%
     mutate(dG_deviation = abs(dG - target_dG)) %>%
     mutate(dG_deviation_halves = abs(target_dG_halves - dG_1st_half) + abs(target_dG_halves - dG_2nd_half))
-  return(filt_df) 
+  
+  if(nrow(filt_df) == 0){
+    print("ERROR: No candidate passed the filtering. Adjust the filtering parameters!")
+  } else {
+    print(paste(nrow(filt_df), "potentially overlapping probes passed filtering!"))
+    return(filt_df) 
+  }
 }
 
 
@@ -287,6 +340,31 @@ summarise_blast_output <- function(blast_output, allowOverlapBreakRegion){
   
 }
 
+screen_with_blast_summary <- function(candidate_probes_filtered, max_blast_matches, blast_summary) {
+  ## ---- Screen candidate probes
+  screened_ids <- blast_summary %>%
+    filter(n_matches <= max_blast_matches) %>%
+    pull(qseqid)
+  candidate_probes_blast_screened <- candidate_probes_filtered %>%
+    filter(unique_id %in% screened_ids)
+
+  if (nrow(candidate_probes_blast_screened) == 0) {
+    print("ERROR: No probes passed BLAST screen. Relax the filtering parameters!")
+  } else {
+    ## ---- Merge overlapping intervals for the inspection plot
+    candidate_probes_blast_screened <- mutate(candidate_probes_blast_screened, chrom = "valr")
+    merge_df <- bed_merge(candidate_probes_blast_screened) %>%
+      mutate(region_length = end - start + 1) %>%
+      mutate(type = case_when(
+        region_length >= 2 * oligo_length ~ 1,
+        region_length < 2 * oligo_length ~ 0,
+        TRUE ~ 0
+      ))
+
+    output <- list(candidate_probes_blast_screened, merge_df)
+    return(output)
+  }
+}
 
 plot_inspection <- function(df, colour_param){
   plot <- ggplot(df) +
@@ -573,12 +651,6 @@ save_params <- function(output){
     max_blast_matches            = max_blast_matches,
     allowOverlapBreakRegion      = TRUE,
     BLAST_db_used                = blast_file,
-    output_files                 = paste(
-      paste0(target_name, "_", "HCR", b_identifier, "_details.csv"),
-      paste0(target_name, "_", "HCR", b_identifier, "_probes.csv"),
-      paste0(target_name, "_", "HCR", b_identifier, "_probes.pdf"),
-      collapse                   = ", "
-    ),
     target_sequence_total_length = target_sequence_total_length,
     input_fasta                  = fasta_file,
     target_sequence_used         = target
@@ -589,7 +661,19 @@ save_params <- function(output){
 }
 
 
+export_outputs <- function(output_dir, probe_details, probes, blast_output) {
+  ## ---- Probe details
+  write_csv(probe_details, paste0(output_dir, target_name, "_", "HCR", b_identifier, "_details.csv"))
 
+  ## ---- Probe sequences
+  write_csv(probes, paste0(output_dir, target_name, "_", "HCR", b_identifier, "_probes.csv"))
+
+  ## ---- Raw Blast output
+  write_csv(blast_output, paste0(output_dir, target_name, "_", "HCR", b_identifier, "_rawblastoutput.csv"))
+
+  ## ---- Probe design parameters
+  save_params(paste0(output_dir, target_name, "_", "HCR", b_identifier, "_params.txt"))
+}
 
 
 
