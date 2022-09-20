@@ -49,9 +49,14 @@ This chunk will take a FASTA file as input. To prevent probe design across exon-
 Alternatively, assign target sequence (character class) to 'target_raw'. 
 
 ```{r}
+<<<<<<< HEAD
 ## ---- Input FASTA and name
 fasta_file <- "./input/Dmel_cip4-exon.fa" 
 target_name <- "cip4-exon"
+=======
+## ---- Get target RNA sequence
+fasta_file <- "./input/Dmel_lac-exon.fa" 
+>>>>>>> a0752cfa84579b288961ebf114eead3ffea502d6
 
 ## ---- Get target RNA sequence
 target_fasta <- readDNAStringSet(fasta_file)
@@ -62,8 +67,17 @@ target <- clean_pasted_seq(target_raw)
 target_sequence_total_length <- nchar(target)
 
 ## ---- Extract candidate probes into a dataframe
+<<<<<<< HEAD
 candidate_probes <- generate_candidate_probes(target_seq   = target,
                                               oligo_length = 52)
+=======
+target_name <- "lac-exon"
+oligo_length <- 52
+
+candidate_probes <- generate_candidate_probes(target_seq   = target,
+                                              oligo_length = oligo_length)
+
+>>>>>>> a0752cfa84579b288961ebf114eead3ffea502d6
 ## ---- Inspect
 inspect_probe_prep(candidate_probes)
 
@@ -137,7 +151,11 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 ## ---- Set params
 blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
 tx2gene_csv <- "./data/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+<<<<<<< HEAD
 max_blast_matches <- 1 # Max number of BLAST hits
+=======
+max_blast_matches <- 1 # Number of BLAST hits
+>>>>>>> a0752cfa84579b288961ebf114eead3ffea502d6
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
 ## ---- Set up blast environment
