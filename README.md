@@ -19,7 +19,10 @@ Create conda environment for BLAST.
     conda install -c bioconda blast
     blastn -h  # check installation
 
-Download/Get BLAST database fasta (from MK) and copy to a desired directory and build a database.
+Decompress BLAST database fasta (from MK, Dmel only) and copy to a desired directory and build a database.
+
+    # cd to the repo directory
+    gzip -cd data/BLAST/Dmel_ens99_from-MK.fa.gz > /path/to/fasta
 
     conda activate BLAST
     makeblastdb -in /path/to/fasta -parse_seqids -title Dmel_ens99 -dbtype nucl
@@ -60,9 +63,10 @@ Following hairpins are available in Davis lab and from Haram.
 
 ## Output
 
-There are four outputs:
+If ran successfully, there will be five outputs in a named folder:
 
-    probes.txt    : final probe sequences to order
-    probes.pdf    : placing of probes along the target RNA sequence
-    details.csv   : thermodynamics and other calculated values of the final probes
-    params.txt    : parameters used for the design
+    probes.txt          : final probe sequences to order
+    probes.pdf          : placing of probes along the target RNA sequence
+    details.csv         : thermodynamics and other calculated values of the final probes
+    params.txt          : parameters used for the design
+    rawblastoutput.csv  : Raw blast output of candidate probes 
