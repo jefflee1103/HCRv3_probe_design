@@ -23,7 +23,7 @@ library(Biostrings) # Bioconductor
 library(rBLAST) # Github
 
 ## ---- Load functions
-source("./src/HCR_design.R")
+source("./R/HCR_design.R")
 
 ## ---- Add BLAST installation to PATH
 ## The PATH edit only temporarily applies to this QMD, so this code should be run each session.
