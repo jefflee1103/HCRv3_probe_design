@@ -203,7 +203,7 @@ probes <- get_final_probe_sequences(probe_details)
 
 ```{r}
 ## ---- Create output directory
-output_dir <- paste0("./output/", target_name, "_", "HCR", b_identifier, "/")
+output_dir <- paste0("./output/", Sys.Date(), "_", target_name, "_", "HCR", b_identifier, "/")
 if(!dir.exists(output_dir)){dir.create(output_dir)}
 
 ## ---- Export outputs 

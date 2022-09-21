@@ -1,4 +1,4 @@
-creation_date	2022-09-20 23:34:16
+creation_date	2022-09-21 11:59:43
 n_threads	4
 target_name	cip4-exon
 HCRv3_B_version	B1
