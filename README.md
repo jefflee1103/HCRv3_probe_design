@@ -59,7 +59,7 @@ Following hairpins are available in Davis lab and from Haram.
 
 |   B1  |   B2  |   B3  |   B4  |
 |:-----:|:-----:|:-----:|:-----:|
-| AF647 | AF488 | AF546 | Af594 |
+| AF647 | AF488 | AF546 | AF594 |
 
 ## Output
 

@@ -40,6 +40,6 @@ clean_ucsc_fasta_directory <- function(directory) {
 
 # ----- Usage 
 
-clean_ucsc_fasta_directory("~/Desktop")
+clean_ucsc_fasta_directory("~/Desktop/untitled folder/")
 
 

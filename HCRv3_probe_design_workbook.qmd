@@ -1,6 +1,7 @@
 ---
 title: "HCR probe design"
 format: html
+output-file: output/output.pdf
 editor_options: 
   chunk_output_type: console
 ---
@@ -50,8 +51,8 @@ Alternatively, assign target sequence (character class) to 'target_raw'.
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/Dmel_cip4-exon.fa" 
-target_name <- "cip4-exon"
+fasta_file <- "./input/Dmel_imp-RB-exon3-6_cleaned.fa" 
+target_name <- "imp-exon"
 
 ## ---- Get target RNA sequence
 target_fasta <- readDNAStringSet(fasta_file)
@@ -238,9 +239,6 @@ ggsave(paste0(output_dir, target_name, "_", "HCR", b_identifier, "_probes.pdf"),
 
 
 
-/usr/people/bioc1402/data/computational_projects/C2/2.25.fishprobe_design/dmel_200729/offtarget_filtering/Dmel
-[16:15] Mary Thompson
-/usr/people/bioc1402/miniconda3/envs/ribopop_probe_design
 
 
 
