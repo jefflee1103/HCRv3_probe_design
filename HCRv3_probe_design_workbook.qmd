@@ -51,8 +51,8 @@ Alternatively, assign target sequence (character class) to 'target_raw'.
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/Dmel_imp-RB-exon3-6_cleaned.fa" 
-target_name <- "imp-exon"
+fasta_file <- "./input/HBV_pgRNA-specific_sequence.fa" 
+target_name <- "HBV-pgRNA"
 
 ## ---- Get target RNA sequence
 target_fasta <- readDNAStringSet(fasta_file)
@@ -136,9 +136,9 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
 ## ---- Set params
-blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
-tx2gene_csv <- "./data/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
-max_blast_matches <- 1 # Max number of BLAST hits
+blast_file <- "~/Documents/BLAST/Hsap/Hsap_ens99_from-MK.fa"
+tx2gene_csv <- "./data/Hsap_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+max_blast_matches <- 5 # Max number of BLAST hits
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
 ## ---- Set up blast environment
@@ -151,6 +151,8 @@ names(seqs) <- candidate_probes_filtered$unique_id
 ## ---- BLAST nucleotide
 blast_output <- run_blastn_short(db, seqs, tx2gene_csv)
 blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion)
+
+ggplot(blast_summary, aes(n_matches)) + geom_histogram(binwidth = 1)
 
 ## ---- Screen candidate probes
 blast_screened <- screen_with_blast_summary(candidate_probes_filtered, max_blast_matches, blast_summary)

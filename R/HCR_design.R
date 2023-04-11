@@ -311,10 +311,29 @@ run_blastn_short <- function(db, seqs, tx2gene_csv){
     filter(bitscore > 32) %>%
     filter(evalue < 50) %>%
     separate(col = sseqid, into = c("sseqid", "is_intron"), sep = "_") %>%
+    mutate(sseqid = str_replace(sseqid, "\\..*", "")) %>%
     left_join(tx2gene, by = c("sseqid" = "tx_id")) %>%
     dplyr::select(qseqid, sseqid, gene_id, gene_name, everything()) %>%
-    mutate(gene_id = if_else(str_detect(sseqid, "FBgn"), sseqid, gene_id))
+    mutate(gene_id = if_else(str_detect(sseqid, "FBgn|ENSG"), sseqid, gene_id))
 }
+
+# run_blastn_short_Hsap <- function(db, seqs, tx2gene_csv){
+#   col_names <- c('qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore')
+#   tx2gene <- read_csv(tx2gene_csv)
+#   predict(db, seqs, 
+#           BLAST_args = paste0("-task blastn-short ",
+#                               "-dust no ",
+#                               "-soft_masking false ",
+#                               "-num_threads 4 ")) %>%
+#     setNames(col_names) %>%
+#     filter(bitscore > 32) %>%
+#     filter(evalue < 50) %>%
+#     separate(col = sseqid, into = c("sseqid", "is_intron"), sep = "_") %>%
+#     mutate(sseqid = str_replace(sseqid, "\\..*", "")) %>%
+#     left_join(tx2gene, by = c("sseqid" = "tx_id")) %>%
+#     dplyr::select(qseqid, sseqid, gene_id, gene_name, everything()) %>%
+#     mutate(gene_id = if_else(str_detect(sseqid, "ENSG"), sseqid, gene_id))
+# }
 
 
 summarise_blast_output <- function(blast_output, allowOverlapBreakRegion){
