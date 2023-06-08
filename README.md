@@ -6,54 +6,38 @@ Designs HCRv3 probes (split probes) and attaches split initiator probes. This wo
 
 ### Download the entire repo
 
+### BLAST installations
 
+Install BLAST from https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/. Use *.dmg file for Mac. Then check that `R` can find the installed BLAST. If it can't, add the BLAST installation path to R system path using `Sys.setenv(PATH = paste(Sys.getenv("PATH"), path/to/blast/bin, sep = .Platform$path.sep))`
 
-### BLAST installation
+  Sys.which("blastn") # should say sth like "/usr/local/ncbi/blast/bin/blastn" 
 
-It is recommended to use conda environment for BLAST installation. Make sure to use x86 version of Miniconda3, not the arm64 version: https://docs.conda.io/en/latest/miniconda.html
+For **Linux only**, install `libpq-dev` on your linux machine. Not required for MacOS.  
 
-Create conda environment for BLAST.
+    sudo apt-get install libpq-dev
 
-    conda create -n BLAST python=3.7
-    conda activate BLAST
-    conda install -c bioconda blast
-    blastn -h  # check installation
+Install `metablastr` and dependencies (https://github.com/drostlab/metablastr) in `R`. Make sure your Mac has XCode installed in order to install `devtools`.
 
-Decompress BLAST database fasta (from MK, Dmel only) and copy to a desired directory and build a database.
+    # if (!requireNamespace("BiocManager", quietly = TRUE))
+    # install.packages("BiocManager")
+
+    BiocManager::install(c("Biostrings", "GenomicFeatures", "GenomicRanges", "Rsamtools", "IRanges", "rtracklayer", "biomaRt"))
+
+    # install.packages("devtools")
+    devtools::install_github("HajkD/metablastr", build_vignettes = TRUE, dependencies = TRUE)
+
+Decompress the BLAST database fasta file (from MK) and copy to a desired directory. Dmel BLAST database is included in this repo. Message me for Human and Mouse BLAST databases. 
 
     # cd to the repo directory
     gzip -cd data/BLAST/Dmel_ens99_from-MK.fa.gz > /path/to/fasta
 
-    conda activate BLAST
-    makeblastdb -in /path/to/fasta -parse_seqids -title Dmel_ens99 -dbtype nucl
+### Install other R packages
 
-### Install rBLAST (R wrapper for BLAST)
-
-Install `rBLAST` (https://github.com/mhahsler/rBLAST) and `Biostrings` in `R`. Make sure your Mac has XCode installed in order to install `devtools`.
-
-    install.packages("devtools")
-    devtools::install_bioc("Biostrings")
-    devtools::install_bioc("rtracklayer")
-    devtools::install_github("mhahsler/rBLAST")
-
-### Add PATH to BLAST in R System
-
-Conda-installed binaries are not found in `R` by default. To append the BLAST PATH in R system, find the installed `BLAST` binary. On macos, it should be under `opt/miniconda3/envs/BLAST/bin`.
-
-    Sys.getenv("PATH") # the current PATH searched in R
-    Sys.setenv(PATH = paste(Sys.getenv("PATH"), "/opt/miniconda3/envs/BLAST/bin", sep = .Platform$path.sep))
-    Sys.getenv("PATH")
-
-Check `R` can find the `BLAST` Installation
-
-    Sys.which("blastn")
-    # should say something like "/opt/miniconda3/envs/BLAST/bin/blastn"
-
-NOTE: the PATH edit is temporary and only applies to the current R session. so the above chunk should be run every time with a new session. The `HCRv3_probe_design_workbook.qmd` has environment chunk that handles this.  
+    install.packages(c("tidyverse", "furrr", "patchwork", "valr"))
 
 ## Usage
 
-Follow the `HCRv3_probe_design_workbook.qmd` workflow. Input target sequence can be supplied as a FASTA file. 
+Follow the `HCRv3_probe_design_workbook.qmd` workflow. Input target sequence can be supplied as a FASTA file, or manually paste the sequence to `target_raw` variable.  
 
 Following hairpins are available in Davis lab and from Haram. 
 

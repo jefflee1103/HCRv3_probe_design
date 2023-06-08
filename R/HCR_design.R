@@ -3,7 +3,7 @@ library(furrr)
 library(patchwork) 
 library(valr) 
 library(Biostrings)
-library(rBLAST)
+library(metablastr)
 oligo_length <- 52
 
 clean_pasted_seq <- function(sequence){
@@ -299,22 +299,49 @@ filter_candidate_probes <- function(annotated_df){
 }
 
 
-run_blastn_short <- function(db, seqs, tx2gene_csv){
-  col_names <- c('qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore')
+run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
+  # col_names <- c('qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore')
   tx2gene <- read_csv(tx2gene_csv)
-  predict(db, seqs, 
-          BLAST_args = paste0("-task blastn-short ",
-                              "-dust no ",
-                              "-soft_masking false ",
-                              "-num_threads 4 ")) %>%
-    setNames(col_names) %>%
-    filter(bitscore > 32) %>%
+  # predict(db, seqs, 
+  #         BLAST_args = paste0("-task blastn-short ",
+  #                             "-dust no ",
+  #                             "-soft_masking false ",
+  #                             "-num_threads 4 ")) %>%
+  #   setNames(col_names) %>%
+  #   filter(bitscore > 32) %>%
+  #   filter(evalue < 50) %>%
+  #   separate(col = sseqid, into = c("sseqid", "is_intron"), sep = "_") %>%
+  #   mutate(sseqid = str_replace(sseqid, "\\..*", "")) %>%
+  #   left_join(tx2gene, by = c("sseqid" = "tx_id")) %>%
+  #   dplyr::select(qseqid, sseqid, gene_id, gene_name, everything()) %>%
+  #   mutate(gene_id = if_else(str_detect(sseqid, "FBgn|ENSG"), sseqid, gene_id))
+
+  candidates <- df
+  seqs <- DNAStringSet(candidates$target_sequence)
+  names(seqs) <- candidates$unique_id
+
+  temp_fasta_path <- file.path(tempdir(), "query.fasta")
+  Biostrings::writeXStringSet(seqs, temp_fasta_path, format = "fasta")
+
+  blast_output <- blast_nucleotide_to_nucleotide(
+    query = temp_fasta_path,
+    subject = db,
+    evalue = 2,
+    task = "blastn-short",
+    cores = cores,
+    output.path = tempdir()
+  )
+
+  blast_output <- blast_output %>%
+    filter(bit_score > 32) %>%
     filter(evalue < 50) %>%
-    separate(col = sseqid, into = c("sseqid", "is_intron"), sep = "_") %>%
-    mutate(sseqid = str_replace(sseqid, "\\..*", "")) %>%
-    left_join(tx2gene, by = c("sseqid" = "tx_id")) %>%
-    dplyr::select(qseqid, sseqid, gene_id, gene_name, everything()) %>%
-    mutate(gene_id = if_else(str_detect(sseqid, "FBgn|ENSG"), sseqid, gene_id))
+    tidyr::separate(col = subject_id, into = c("subject_id", "is_intron"), sep = "_") %>%
+    mutate(subject_id = str_replace(subject_id, "\\..*", "")) %>%
+    left_join(tx2gene, by = c("subject_id" = "tx_id")) %>%
+    dplyr::select(query_id, subject_id, gene_id, gene_name, everything()) %>%
+    mutate(gene_id = if_else(str_detect(subject_id, "FBgn|ENSG|ENSMUSG"), subject_id, gene_id))
+
+  return(blast_output)
 }
 
 # run_blastn_short_Hsap <- function(db, seqs, tx2gene_csv){
@@ -339,19 +366,19 @@ run_blastn_short <- function(db, seqs, tx2gene_csv){
 summarise_blast_output <- function(blast_output, allowOverlapBreakRegion){
   if(allowOverlapBreakRegion == TRUE){
     blast_summary <- blast_output %>%
-      filter(!(length <= 17 & qstart < 25 & qend > 28)) %>%
-      dplyr::select(qseqid, gene_id) %>%
+      filter(!(alig_length <= 17 & q_start < 25 & q_end > 28)) %>%
+      dplyr::select(query_id, gene_id) %>%
       distinct() %>%
-      group_by(qseqid) %>%
+      group_by(query_id) %>%
       summarise(n_matches = n(),
                 matches = paste(gene_id, collapse = "; ")) %>%
       ungroup()
     
   } else if(allowOverlapBreakRegion == FALSE) {
     blast_summary <- blast_output %>%
-      dplyr::select(qseqid, gene_id) %>%
+      dplyr::select(query_id, gene_id) %>%
       distinct() %>%
-      group_by(qseqid) %>%
+      group_by(query_id) %>%
       summarise(n_matches = n(),
                 matches = paste(gene_id, collapse = "; ")) %>%
       ungroup()
@@ -363,7 +390,7 @@ screen_with_blast_summary <- function(candidate_probes_filtered, max_blast_match
   ## ---- Screen candidate probes
   screened_ids <- blast_summary %>%
     filter(n_matches <= max_blast_matches) %>%
-    pull(qseqid)
+    pull(query_id)
   candidate_probes_blast_screened <- candidate_probes_filtered %>%
     filter(unique_id %in% screened_ids)
 
