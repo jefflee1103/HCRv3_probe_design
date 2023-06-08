@@ -6,11 +6,13 @@ Designs HCRv3 probes (split probes) and attaches split initiator probes. This wo
 
 ### Download the entire repo
 
-### BLAST installations
+### Install BLAST
 
-Install BLAST from https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/. Use *.dmg file for Mac. Then check that `R` can find the installed BLAST. If it can't, add the BLAST installation path to R system path using `Sys.setenv(PATH = paste(Sys.getenv("PATH"), path/to/blast/bin, sep = .Platform$path.sep))`
+Install BLAST from https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/. Use *.dmg file for Mac. Then check that `R` can find the installed BLAST. If it can't, add the BLAST installation path to R system path using `Sys.setenv(PATH = paste(Sys.getenv("PATH"), path/to/blast/bin, sep = .Platform$path.sep))`.  
 
-  Sys.which("blastn") # should say sth like "/usr/local/ncbi/blast/bin/blastn" 
+    Sys.which("blastn") # should say sth like "/usr/local/ncbi/blast/bin/blastn" 
+
+#### Install R wrapper for BLAST
 
 For **Linux only**, install `libpq-dev` on your linux machine. Not required for MacOS.  
 
@@ -31,7 +33,7 @@ Decompress the BLAST database fasta file (from MK) and copy to a desired directo
     # cd to the repo directory
     gzip -cd data/BLAST/Dmel_ens99_from-MK.fa.gz > /path/to/fasta
 
-### Install other R packages
+#### Install other R packages
 
     install.packages(c("tidyverse", "furrr", "patchwork", "valr"))
 
