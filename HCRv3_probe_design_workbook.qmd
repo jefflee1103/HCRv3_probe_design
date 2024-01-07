@@ -8,11 +8,11 @@ editor_options:
 
 ## Update
 
-Modified: 2023.06.08
+Modified: 2024.01.06
 
 ## Environment
 
-Requires installation of blastn using conda (see README.md).
+Requires installation of blastn (see README.md).
 
 ```{r}
 ## ---- R packages 
@@ -39,14 +39,14 @@ plan(multisession, workers = n_threads)
 This chunk will take a FASTA file as input. To prevent probe design across exon-intron junctions do either of the following:
 
   (1) Put character N between exons in case of one single fasta entry; or
-  (2) Set each exon as separate fasta entry in a single fasta file. 
+  (2) Set each exon as separate fasta entries in a single fasta file. 
   
 Alternatively, assign target sequence (character class) to 'target_raw'. 
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/Dmel_imp-RB-exon3-6_cleaned.fa" 
-target_name <- "imp-exon"
+fasta_file <- "./input/Dmel_cip4-exon.fa" 
+target_name <- "cip4-exon"
 
 ## ---- Get target RNA sequence
 target_fasta <- readDNAStringSet(fasta_file)
@@ -67,8 +67,6 @@ inspect_probe_prep(candidate_probes)
 
 ## Calculate thermodynamic and sequence composition parameters for candidate probes 
 
-TODO: add hairpin_dG, homodimer_dG calculations as in MK's ribopop design?
-
 ```{r}
 ## ---- Set the hybridisation condition
 temperature <- 37
@@ -80,6 +78,9 @@ thermodynamics <- get_thermodynamic_parameters(candidate_probes, temperature, Na
 
 ## ---- Annotate candidate sequences 
 candidate_probes_annotated <- annotate_probes(candidate_probes, thermodynamics)
+
+## ---- Generate exploratory plots
+c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
 
 ```
 
@@ -94,19 +95,25 @@ candidate_probes_annotated <- annotate_probes(candidate_probes, thermodynamics)
  - dG -32
  - GC [40, 60]
  - Nucleotide composition rules
-
-```{r}
-## ---- Generate exploratory plots
-c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
-
-```
+ 
+Default parameters: 
+target_dG <- -60
+target_dG_halves <- -32
+dG_range <- c(-75, -50)
+Tm_range <- c(10, 100)
+GC_range <- c(0.4, 0.7)
+pass_a_comp       <- FALSE
+pass_c_comp       <- FALSE
+pass_a_stack      <- TRUE
+pass_c_stack      <- TRUE
+pass_c_spec_stack <- TRUE
 
 ```{r}
 ## ---- Set filtering parameters
 target_dG <- -60
 target_dG_halves <- -32
 dG_range <- c(-75, -50)
-Tm_range <- c(10, 100)
+Tm_range <- c(30, 90)
 GC_range <- c(0.4, 0.7)
 pass_a_comp       <- FALSE
 pass_c_comp       <- FALSE
@@ -130,7 +137,7 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
 ## ---- Set params
-blast_file <- "~/Documents/BLAST/Dmel/Dmel_ens99_from-MK.fa"
+blast_file <- "~/Documents/BLAST/Dmel/Dmel_BLASTdb_ens99.fa"
 tx2gene_csv <- "./data/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 max_blast_matches <- 1 # Max number of BLAST hits
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
@@ -169,7 +176,7 @@ plot_inspection(candidate_probes_final, "Tm") +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
       colour = "gray40", size = 2,
-      inherit.aes = FALSE)
+      inherit.aes = FALSE) + theme_bw()
 
 ```
 

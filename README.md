@@ -1,6 +1,6 @@
 # HCRv3 split probe design
 
-Designs HCRv3 probes (split probes) and attaches split initiator probes. This workflow is an adapted version of ProbeDesignHD from Raj lab and Sauka-Spengler lab.
+Designs HCRv3 probes (split-probes) and attaches split initiator sequences (HCR B1-B5).
 
 ## Installation
 
@@ -28,10 +28,10 @@ Install `metablastr` and dependencies (https://github.com/drostlab/metablastr) i
     # install.packages("devtools")
     devtools::install_github("HajkD/metablastr", build_vignettes = TRUE, dependencies = TRUE)
 
-Decompress the BLAST database fasta file (from MK) and copy to a desired directory. Dmel BLAST database is included in this repo. Message me for Human and Mouse BLAST databases. 
+Decompress the BLAST database fasta file and copy/unzip to a desired directory. D.mel BLAST database based on ENSEMBL v99 is provided in this repo. Message me for Human and Mouse BLAST databases. 
 
     # cd to the repo directory
-    gzip -cd data/BLAST/Dmel_ens99_from-MK.fa.gz > /path/to/fasta
+    gzip -cd data/BLAST/Dmel_BLASTdb_ens99.fa.gz > /path/to/desired/directory
 
 #### Install other R packages
 
@@ -39,17 +39,13 @@ Decompress the BLAST database fasta file (from MK) and copy to a desired directo
 
 ## Usage
 
-Follow the `HCRv3_probe_design_workbook.qmd` workflow. Input target sequence can be supplied as a FASTA file, or manually paste the sequence to `target_raw` variable.  
+Follow the `HCRv3_probe_design_workbook.qmd` workflow. Input target sequence can be supplied as a FASTA file, or manually paste the sequence to `target_raw` variable. The desginer automatically removes empty characters and it is not case-sensitive. Either DNA or RNA sequence can be used as input. 
 
-Following hairpins are available in Davis lab and from Haram. 
-
-|   B1  |   B2  |   B3  |   B4  |
-|:-----:|:-----:|:-----:|:-----:|
-| AF647 | AF488 | AF546 | AF594 |
+See Zenodo publication for a more detailed user manual.
 
 ## Output
 
-If ran successfully, there will be five outputs in a named folder:
+If ran successfully, there will be five outputs in a named output folder:
 
     probes.txt          : final probe sequences to order
     probes.pdf          : placing of probes along the target RNA sequence
