@@ -1,6 +1,7 @@
 # HCRv3 split probe design
 
 Designs HCRv3 probes (split-probes) and attaches split initiator sequences (HCR B1-B5).
+Please see user manual PDF file for a detailed guide. 
 
 ## Installation
 
