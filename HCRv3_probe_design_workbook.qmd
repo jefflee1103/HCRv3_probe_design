@@ -86,16 +86,6 @@ c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
 
 ## Filter based on thermodynamics / base composition parameters 
 
-- Raj lab HCR (52nt)
- - dG [-70, -50] https://journals.asm.org/doi/10.1128/mbio.03751-21 
-- Sakura-Spengler lab (25nt) 
- - GC [37, 85]
- - Tm [55, 77]
-- Oligostan 26-32nt
- - dG -32
- - GC [40, 60]
- - Nucleotide composition rules
- 
 Default parameters: 
 target_dG <- -60
 target_dG_halves <- -32
