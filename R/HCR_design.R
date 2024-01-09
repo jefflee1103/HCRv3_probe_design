@@ -142,22 +142,14 @@ get_thermodynamic_parameters <- function(candidate_probes, temperature, Na, olig
 
 
 passed_a_comp <- function(theProbeSeq){
-  # tolower(theProbeSeq) -> theProbeSeq
-  # theVerdict <- FALSE
-  # if((summary(theProbeSeq)$compo[names(summary(theProbeSeq)$compo)=="a"] / summary(theProbeSeq)$length) < 0.28) theVerdict <- TRUE
-  # return(theVerdict)
-  
+
   A_composition <- str_count(theProbeSeq, pattern = "A") / nchar(theProbeSeq)
   theVerdict <- if_else(A_composition < 0.28, TRUE, FALSE)
   return(theVerdict)
 }
 
 passed_a_stack <- function(theProbeSeq){
-  # theVerdict <- FALSE
-  # probeSeq <- paste(toupper(theProbeSeq),collapse="")
-  # if(length(grep("AAAA",probeSeq))==0) theVerdict <- TRUE
-  # return(theVerdict)
-  
+
   theVerdict <- if_else(
     str_detect(theProbeSeq, "AAAA"), FALSE, TRUE
   )
@@ -165,12 +157,7 @@ passed_a_stack <- function(theProbeSeq){
 }
 
 passed_c_comp <- function(theProbeSeq){
-  # tolower(theProbeSeq) -> theProbeSeq
-  # theVerdict <- FALSE
-  # (summary(theProbeSeq)$compo[names(summary(theProbeSeq)$compo)=="c"] / summary(theProbeSeq)$length) -> cComp
-  # if(cComp < 0.28 & cComp > 0.22) theVerdict <- TRUE
-  # return(theVerdict)
-  
+
   C_composition <- str_count(theProbeSeq, pattern = "C") / nchar(theProbeSeq)
   theVerdict <- if_else(
     C_composition > 0.22 & C_composition < 0.28, TRUE, FALSE)
@@ -178,11 +165,7 @@ passed_c_comp <- function(theProbeSeq){
 }
 
 passed_c_stack <- function(theProbeSeq){
-  # theVerdict <- FALSE
-  # probeSeq <- paste(toupper(theProbeSeq),collapse="")
-  # if(length(grep("CCCC",probeSeq))==0) theVerdict <- TRUE
-  # return(theVerdict)
-  
+
   theVerdict <- if_else(
     str_detect(theProbeSeq, "CCCC"), FALSE, TRUE
   )
@@ -190,22 +173,6 @@ passed_c_stack <- function(theProbeSeq){
 }
 
 passed_c_spec_stack <- function(theProbeSeq){
-  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  # Oligostan PNAS rule 5
-  # No non-consecutive C in any 6 nucleotides in the first 12 positions
-  
-  # tolower(theProbeSeq) -> theProbeSeq
-  # theVerdict <- FALSE
-  # matrix(rep(times=6,seq(1,6,1)),ncol=6,byrow=T) -> posrow
-  # matrix(rep(times=6,seq(0,5,1)),ncol=6,byrow=F) -> poscol
-  # matrix(theProbeSeq[posrow + poscol],ncol=6,byrow=FALSE) -> theprobestartmatrix
-  # apply(theprobestartmatrix,1,function(vectchar){
-  #   summary(as.SeqFastadna(vectchar))$compo -> tmpcompo
-  #   tmpcompo[names(tmpcompo)=="c"] -> tmpcnb
-  #   return(tmpcnb / summary(as.SeqFastadna(vectchar))$length)
-  # }) -> thecpercent
-  # if(length(thecpercent[thecpercent > 0.5])==0) theVerdict <- TRUE
-  # return(theVerdict)
   max_c_comp <- map_dbl(1:7, ~ {
     substring <- str_sub(theProbeSeq, start = .x, end = .x + 5)
     C_composition <- str_count(substring, pattern = "C") / nchar(substring)
@@ -811,13 +778,13 @@ save_params <- function(output){
     dG_range                     = paste(dG_range, collapse = ":"),
     Tm_range                     = paste(Tm_range, collapse = ":"),
     GC_range                     = paste(GC_range, collapse = ":"),
-    pass_a_comp                  = FALSE,
-    pass_c_comp                  = FALSE,
-    pass_a_stack                 = TRUE,
-    pass_c_stack                 = TRUE,
-    pass_c_spec_stack            = TRUE,
+    pass_a_comp                  = as.character(pass_a_comp),
+    pass_c_comp                  = as.character(pass_c_comp),
+    pass_a_stack                 = as.character(pass_a_stack),
+    pass_c_stack                 = as.character(pass_c_stack),
+    pass_c_spec_stack            = as.character(pass_c_spec_stack),
     max_blast_matches            = max_blast_matches,
-    allowOverlapBreakRegion      = TRUE,
+    allowOverlapBreakRegion      = as.character(allowOverlapBreakRegion),
     BLAST_db_used                = blast_file,
     target_sequence_total_length = target_sequence_total_length,
     input_fasta                  = fasta_file,
