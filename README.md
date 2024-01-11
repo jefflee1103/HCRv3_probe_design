@@ -1,6 +1,6 @@
-# HCRv3 split probe design
+# Hybridisation Chain Reaction (HCR) split probe designer
 
-Designs HCRv3 probes (split-probes) and attaches split initiator sequences (HCR B1-B5).
+Designs third-generation HCR probes (HCRv3, split-probes) and attaches split initiator sequences (HCR B1-B5).
 Please see user manual PDF file for a detailed guide. 
 
 ## Installation
