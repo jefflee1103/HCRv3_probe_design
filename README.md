@@ -1,5 +1,7 @@
 # Hybridisation Chain Reaction (HCR) split probe designer
 
+[![DOI](https://zenodo.org/badge/511863830.svg)](https://zenodo.org/doi/10.5281/zenodo.10491693)
+
 Designs third-generation HCR probes (HCRv3, split-probes) and attaches split initiator sequences (HCR B1-B5).
 Please see user manual PDF file for a detailed guide. 
 
