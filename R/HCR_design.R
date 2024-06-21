@@ -293,7 +293,7 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
   blast_output <- blast_nucleotide_to_nucleotide(
     query = temp_fasta_path,
     subject = db,
-    evalue = 2,
+    evalue = 10,
     task = "blastn-short",
     strand = "plus",
     cores = cores,
@@ -331,9 +331,16 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
 # }
 
 
-summarise_blast_output <- function(blast_output, allowOverlapBreakRegion, evalue_cutoff){
+summarise_blast_output <- function(blast_output, allowOverlapBreakRegion, evalue_cutoff, consider_pseudogene){
   if(allowOverlapBreakRegion == TRUE){
     blast_summary <- blast_output %>%
+      filter(
+        if(consider_pseudogene == FALSE){
+          !str_detect(gene_biotype, "pseudogene")
+        } else {
+          gene_biotype == gene_biotype
+        }
+      ) %>%
       filter(!(alig_length <= 25 & q_start < 25 & q_end > 28)) %>%
       filter(evalue < evalue_cutoff) %>%
       dplyr::select(query_id, gene_id) %>%
@@ -345,6 +352,14 @@ summarise_blast_output <- function(blast_output, allowOverlapBreakRegion, evalue
     
   } else if(allowOverlapBreakRegion == FALSE) {
     blast_summary <- blast_output %>%
+      blast_summary <- blast_output %>%
+        filter(
+          if(consider_pseudogene == FALSE){
+            !str_detect(gene_biotype, "pseudogene")
+          } else {
+            gene_biotype == gene_biotype
+          }
+        ) %>%
       filter(evalue < evalue_cutoff) %>%
       dplyr::select(query_id, gene_id) %>%
       distinct() %>%
@@ -358,11 +373,11 @@ summarise_blast_output <- function(blast_output, allowOverlapBreakRegion, evalue
 
 screen_with_blast_summary <- function(candidate_probes_filtered, max_blast_matches, blast_summary) {
   ## ---- Screen candidate probes
-  screened_ids <- blast_summary %>%
-    filter(n_matches <= max_blast_matches) %>%
+  screen_out_ids <- blast_summary %>%
+    filter(n_matches > max_blast_matches) %>%
     pull(query_id)
   candidate_probes_blast_screened <- candidate_probes_filtered %>%
-    filter(unique_id %in% screened_ids)
+    filter(!(unique_id %in% screen_out_ids))
 
   if (nrow(candidate_probes_blast_screened) == 0) {
     print("ERROR: No probes passed BLAST screen. Relax the filtering parameters!")
@@ -1033,6 +1048,7 @@ save_params <- function(output){
     evalue_cutoff                = evalue_cutoff,
     max_blast_matches            = max_blast_matches,
     allowOverlapBreakRegion      = as.character(allowOverlapBreakRegion),
+    consider_pseudogene.         = as.character(consider_pseudogene),
     BLAST_db_used                = blast_file,
     target_sequence_total_length = target_sequence_total_length,
     input_fasta                  = fasta_file,
