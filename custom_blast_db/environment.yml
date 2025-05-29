@@ -1,0 +1,23 @@
+# environment.yml
+# ------------------
+# Conda environment for running *build_custom_blast_db.py*
+#
+# Create the environment with:
+#     conda env create -f environment.yml   # or `mamba env create -f ...`
+# Activate with:
+#     conda activate hcr_custom_blast_db
+#
+# (The name can be overridden, e.g. `conda env create -n my_env -f environment.yml`)
+name: hcr_custom_blast_db
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python >=3.8
+  - biopython
+  - requests
+  - gffutils
+  - pyfaidx
+  - tqdm
+  # optional runtime helpers
+  - mamba  # fast solver (optional)

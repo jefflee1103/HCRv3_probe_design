@@ -45,8 +45,8 @@ Alternatively, assign target sequence (character class) to 'target_raw'.
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/Mmus_Actb-exon.fa" 
-target_name <- "Mmus_Actb"
+fasta_file <- "./input/Dmel_cip4-exon.fa" 
+target_name <- "cip4-exon"
 
 ## ---- Get target RNA sequence
 target_fasta <- readBStringSet(fasta_file)
@@ -109,7 +109,7 @@ pass_a_comp       <- TRUE
 pass_c_comp       <- FALSE # stringent one
 pass_a_stack      <- TRUE
 pass_c_stack      <- TRUE
-pass_c_spec_stack <- FALSE # stringent one
+pass_c_spec_stack <- TRUE # stringent one
 
 ## ---- Filter based on thermodynamic/nucleotide compositions
 candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
@@ -127,8 +127,8 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
 ## ---- Set params
-blast_file <- "~/Documents/Data/BLAST/Mmus/Mmus_ens99_from-MK.fa"
-tx2gene_csv <- "./data/Mmus_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+blast_file <- "~/Documents/Data/BLAST/Dmel/Dmel_BLASTdb_ens99.fa"
+tx2gene_csv <- "./data/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 evalue_cutoff <- 0.1 # smaller the value the more lenient
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
@@ -136,7 +136,7 @@ allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 blast_output <- run_blastn_short(df = candidate_probes_filtered, db = blast_file, tx2gene = tx2gene_csv)
 
 ## ---- Choose BLAST threshold
-max_blast_matches <- 7 # Max number of BLAST hits
+max_blast_matches <- 1 # Max number of BLAST hits
 consider_pseudogene <- FALSE # are you considering pseudogenes?
 
 blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion, evalue_cutoff = evalue_cutoff, consider_pseudogene)
@@ -186,7 +186,7 @@ Attach HCR B1/B2/B3/B4/B5 split initiator sequences to selected probe sequences 
 
 ```{r}
 ## ---- Choose hairpin for multiplexing
-b_identifier <- "B4"
+b_identifier <- "B1"
 
 ## ---- Attach hairpin sequences and save 
 probe_details <- attach_hcr_initiatior(candidate_probes_final, b_identifier = b_identifier)
