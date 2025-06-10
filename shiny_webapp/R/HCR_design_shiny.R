@@ -71,74 +71,107 @@ str_revcomp <- function(seq){
 }
 
 
-calculate_thermodynamics <- function(seq, temperature, Na, oligo_conc){
-  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-  # Calculate thermodymic properties of target **RNA** sequence 
-  # Output is a named list of Tm, dG, dH, dS values 
-  
-  ## RNA-DNA energetics from SantaLucia 98 (Takes RNA sequence dimension as input!!)
-  thermodynamics_table <- tibble(
-    dimension = c("AA","AC","AG","AT","CA","CC","CG","CT","GA","GC","GG","GT","TA","TC","TG","TT"),
-    delH = c(-7.8, -5.9, -9.1, -8.3, -9.0, -9.3, -16.3, -7.0, -5.5, -8.0, -12.8, -7.8, -7.8, -8.6, -10.4, -11.5),
-    delS = c(-21.9,-12.3,-23.5,-23.9,-26.1,-23.2,-47.1,-19.7,-13.5,-17.1,-31.9,-21.6,-23.2,-22.9,-28.4,-36.4)
-  )
-  
-  seq_dimension <- map_dfr(1:(nchar(seq)-1), ~ 
-                             tibble(dimension = str_sub(seq, .x, .x + 1))) %>%
-    left_join(thermodynamics_table, by = "dimension") 
-  
-  delH <- sum(seq_dimension$delH) ## kcal/mol
-  delS <- sum(seq_dimension$delS) ## cal/(mol*Kelvin)
-  
-  initH <- 1.9
-  initS <- -3.9 
-  
-  dH <- delH + initH
-  dS <- delS + initS
-  dG <- (dH * 1000 - (temperature + 273.15) * dS) / 1000; ## kcal/mol
-  Tm <- (dH * 1000 / (dS + (1.9872 * log(oligo_conc / 4))) ) - 273.15 + 16.6 * log10(Na)
-  
-  output <- list(Tm, dG, dH, dS) %>% set_names(c("Tm", "dG", "dH", "dS"))
-  return(output)
-}
-
-calculate_thermodynamics_v <- Vectorize(calculate_thermodynamics)
-
+# calculate_thermodynamics <- function(seq, temperature, Na, oligo_conc){
+#   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#   # Calculate thermodymic properties of target **RNA** sequence 
+#   # Output is a named list of Tm, dG, dH, dS values 
+#   
+#   ## RNA-DNA energetics from SantaLucia 98 (Takes RNA sequence dimension as input!!)
+#   thermodynamics_table <- tibble(
+#     dimension = c("AA","AC","AG","AT","CA","CC","CG","CT","GA","GC","GG","GT","TA","TC","TG","TT"),
+#     delH = c(-7.8, -5.9, -9.1, -8.3, -9.0, -9.3, -16.3, -7.0, -5.5, -8.0, -12.8, -7.8, -7.8, -8.6, -10.4, -11.5),
+#     delS = c(-21.9,-12.3,-23.5,-23.9,-26.1,-23.2,-47.1,-19.7,-13.5,-17.1,-31.9,-21.6,-23.2,-22.9,-28.4,-36.4)
+#   )
+#   
+#   seq_dimension <- map_dfr(1:(nchar(seq)-1), ~ 
+#                              tibble(dimension = str_sub(seq, .x, .x + 1))) %>%
+#     left_join(thermodynamics_table, by = "dimension") 
+#   
+#   delH <- sum(seq_dimension$delH) ## kcal/mol
+#   delS <- sum(seq_dimension$delS) ## cal/(mol*Kelvin)
+#   
+#   initH <- 1.9
+#   initS <- -3.9 
+#   
+#   dH <- delH + initH
+#   dS <- delS + initS
+#   dG <- (dH * 1000 - (temperature + 273.15) * dS) / 1000; ## kcal/mol
+#   Tm <- (dH * 1000 / (dS + (1.9872 * log(oligo_conc / 4))) ) - 273.15 + 16.6 * log10(Na)
+#   
+#   output <- list(Tm, dG, dH, dS) %>% set_names(c("Tm", "dG", "dH", "dS"))
+#   return(output)
+# }
+# 
+# calculate_thermodynamics_v <- Vectorize(calculate_thermodynamics)
+# 
+# 
+# get_thermodynamic_parameters <- function(candidate_probes, temperature, Na, oligo_conc) {
+#   candidate_probe_thermodynamics <- future_map(
+#     candidate_probes$target_sequence,
+#     ~ calculate_thermodynamics(
+#       seq = .x,
+#       temperature = temperature,
+#       Na = Na,
+#       oligo_conc = oligo_conc
+#     )
+#   )
+# 
+#   candidate_probe_thermodynamics_1st_half <- future_map(
+#     map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = 1, end = nchar(.x) / 2 - 1)),
+#     ~ calculate_thermodynamics(
+#       seq = .x,
+#       temperature = temperature,
+#       Na = Na,
+#       oligo_conc = oligo_conc
+#     )
+#   )
+# 
+#   candidate_probe_thermodynamics_2nd_half <- future_map(
+#     map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = nchar(.x) / 2 + 2, end = nchar(.x))),
+#     ~ calculate_thermodynamics(
+#       seq = .x,
+#       temperature = temperature,
+#       Na = Na,
+#       oligo_conc = oligo_conc
+#     )
+#   )
+# 
+#   output <- list(candidate_probe_thermodynamics, candidate_probe_thermodynamics_1st_half, candidate_probe_thermodynamics_2nd_half) %>%
+#     set_names(c("Full", "First", "Second"))
+# 
+#   return(output)
+# }
 
 get_thermodynamic_parameters <- function(candidate_probes, temperature, Na, oligo_conc) {
-  candidate_probe_thermodynamics <- future_map(
-    candidate_probes$target_sequence,
-    ~ calculate_thermodynamics(
-      seq = .x,
-      temperature = temperature,
-      Na = Na,
-      oligo_conc = oligo_conc
+  
+  # Use a standard lapply loop. Since the executed C++ function is extremely fast,
+  # this sequential approach is stable and still highly performant.
+  all_results <- lapply(candidate_probes$target_sequence, function(target_seq) {
+    
+    # Calculate thermodynamics for the full probe and its two halves
+    full_thermo <- calculate_thermodynamics_cpp(target_seq, temperature, Na, oligo_conc)
+    
+    first_half_seq <- substr(target_seq, 1, nchar(target_seq) / 2 - 1)
+    first_half_thermo <- calculate_thermodynamics_cpp(first_half_seq, temperature, Na, oligo_conc)
+    
+    second_half_seq <- substr(target_seq, nchar(target_seq) / 2 + 2, nchar(target_seq))
+    second_half_thermo <- calculate_thermodynamics_cpp(second_half_seq, temperature, Na, oligo_conc)
+    
+    # Return a list containing all results for the probe
+    list(
+      Full = full_thermo,
+      First = first_half_thermo,
+      Second = second_half_thermo
     )
+  })
+  
+  # Restructure the list of results into the format expected by the next function
+  output <- list(
+    Full = purrr::map(all_results, "Full"),
+    First = purrr::map(all_results, "First"),
+    Second = purrr::map(all_results, "Second")
   )
-
-  candidate_probe_thermodynamics_1st_half <- future_map(
-    map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = 1, end = nchar(.x) / 2 - 1)),
-    ~ calculate_thermodynamics(
-      seq = .x,
-      temperature = temperature,
-      Na = Na,
-      oligo_conc = oligo_conc
-    )
-  )
-
-  candidate_probe_thermodynamics_2nd_half <- future_map(
-    map_chr(candidate_probes$target_sequence, ~ str_sub(.x, start = nchar(.x) / 2 + 2, end = nchar(.x))),
-    ~ calculate_thermodynamics(
-      seq = .x,
-      temperature = temperature,
-      Na = Na,
-      oligo_conc = oligo_conc
-    )
-  )
-
-  output <- list(candidate_probe_thermodynamics, candidate_probe_thermodynamics_1st_half, candidate_probe_thermodynamics_2nd_half) %>%
-    set_names(c("Full", "First", "Second"))
-
+  
   return(output)
 }
 
@@ -184,6 +217,32 @@ passed_c_spec_stack <- function(theProbeSeq){
 } 
 
 
+# annotate_probes <- function(candidate_probes, thermodynamics){
+#   # Takes candidate_probes df and adds thermodynamic and nucleotide composition parameters
+#   
+#   candidate_probes %>%
+#     mutate(rev_comp = str_revcomp(target_sequence)) %>%
+#     mutate(
+#       GC_content = str_count(target_sequence, pattern = "G|C") / length,
+#       A_content  = str_count(target_sequence, pattern = "A") / length,
+#       C_content  = str_count(target_sequence, pattern = "C") / length
+#     ) %>%
+#     bind_cols(dG = map_dbl(thermodynamics$Full, pluck("dG"))) %>%
+#     bind_cols(Tm = map_dbl(thermodynamics$Full, pluck("Tm"))) %>%
+#     bind_cols(dG_1st_half = map_dbl(thermodynamics$First, pluck("dG"))) %>%
+#     bind_cols(Tm_1st_half = map_dbl(thermodynamics$First, pluck("Tm"))) %>%
+#     bind_cols(dG_2nd_half = map_dbl(thermodynamics$Second, pluck("dG"))) %>%
+#     bind_cols(Tm_2nd_half = map_dbl(thermodynamics$Second, pluck("Tm"))) %>%
+#     mutate(
+#       passed_a_comp       = passed_a_comp(rev_comp),
+#       passed_c_comp       = passed_c_comp(rev_comp),
+#       passed_a_stack      = passed_a_stack(rev_comp),
+#       passed_c_stack      = passed_c_stack(rev_comp),
+#       passed_c_spec_stack = map_lgl(rev_comp, passed_c_spec_stack)
+#     ) %>%
+#     return()
+# }
+
 annotate_probes <- function(candidate_probes, thermodynamics){
   # Takes candidate_probes df and adds thermodynamic and nucleotide composition parameters
   
@@ -194,12 +253,13 @@ annotate_probes <- function(candidate_probes, thermodynamics){
       A_content  = str_count(target_sequence, pattern = "A") / length,
       C_content  = str_count(target_sequence, pattern = "C") / length
     ) %>%
-    bind_cols(dG = map_dbl(thermodynamics$Full, pluck("dG"))) %>%
-    bind_cols(Tm = map_dbl(thermodynamics$Full, pluck("Tm"))) %>%
-    bind_cols(dG_1st_half = map_dbl(thermodynamics$First, pluck("dG"))) %>%
-    bind_cols(Tm_1st_half = map_dbl(thermodynamics$First, pluck("Tm"))) %>%
-    bind_cols(dG_2nd_half = map_dbl(thermodynamics$Second, pluck("dG"))) %>%
-    bind_cols(Tm_2nd_half = map_dbl(thermodynamics$Second, pluck("Tm"))) %>%
+    # CORRECTED SECTION: Replaced pluck() with a more robust extraction method
+    bind_cols(dG = map_dbl(thermodynamics$Full, function(x) x[["dG"]])) %>%
+    bind_cols(Tm = map_dbl(thermodynamics$Full, function(x) x[["Tm"]])) %>%
+    bind_cols(dG_1st_half = map_dbl(thermodynamics$First, function(x) x[["dG"]])) %>%
+    bind_cols(Tm_1st_half = map_dbl(thermodynamics$First, function(x) x[["Tm"]])) %>%
+    bind_cols(dG_2nd_half = map_dbl(thermodynamics$Second, function(x) x[["dG"]])) %>%
+    bind_cols(Tm_2nd_half = map_dbl(thermodynamics$Second, function(x) x[["Tm"]])) %>%
     mutate(
       passed_a_comp       = passed_a_comp(rev_comp),
       passed_c_comp       = passed_c_comp(rev_comp),
@@ -463,214 +523,363 @@ plot_final_probes <- function(df, all_candidates, colour_param){
   return(plot)
 }
 
+#' Find the Optimal Set of Non-Overlapping Probes Prioritizing Probe Count
+#'
+#' This function uses a modified dynamic programming algorithm to find the
+#' non-overlapping probe set that first maximizes the number of probes, and
+#' second, maximizes the score (i.e., minimizes dG deviation).
+#'
+#' @param probes_df A dataframe of candidate probes for a single contiguous region.
+#' @param probe_spacing The minimum number of nucleotides between probes.
+#' @return A tibble containing the optimal set of non-overlapping probes.
 
-get_probes_shortregions <- function(candidate_probes_screened, merge_df){
-  merge_df_short <- merge_df %>%
-    filter(region_length < 2 * oligo_length)
-  probes_short_regions <- candidate_probes_screened %>%
-    bed_intersect(merge_df_short) %>%
-    group_by(start.y, end.y) %>%
-    slice_min(dG_deviation.x, n = 1) %>%
-    slice_min(dG_deviation_halves.x, n = 1) %>%
-    slice_min(start.x, n = 1) %>% ungroup() %>%
-    dplyr::select(-contains(".y"), -contains(".overlap")) %>%
-    dplyr::rename_with(~ str_replace_all(.x, ".x", "")) %>%
-    return()
-}
-
-
-test_distr_combn <- function(probe_midpoints, n_fit, probe_spacing){
-  
-  combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
-  combinations_nonoverlapping <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
-  if(length(combinations_nonoverlapping) == 0) {
-    tibble(
-      midpoint_index = character(),
-      sum_probe_dG_deviations = numeric(),
-      sum_probe_dG_deviations_halves = numeric()
-    ) %>% return()
-  } else {
-    future_map_dfr(combinations_nonoverlapping,
-                   function(combination){
-                     tibble(
-                       midpoint_index = probe_midpoints[combination] %>% paste(collapse = "|"),
-                       sum_probe_dG_deviations = probe_dG_deviations[combination] %>% sum(),
-                       sum_probe_dG_deviations_halves = probe_dG_deviations_halves[combination] %>% sum()
-                     )
-                   }) %>%
-      slice_min(sum_probe_dG_deviations) %>%
-      slice_min(sum_probe_dG_deviations_halves) %>%
-      slice_head(n = 1)
+find_optimal_probe_set_dp <- function(probes_df, probe_spacing) {
+  # Return an empty tibble if the input is empty
+  if (nrow(probes_df) == 0) {
+    return(tibble())
   }
-}
-
-
-
-
-distribute_probes_longregions <- function(candidate_probes_screened, merge_df, probe_spacing){
-  merge_df_long <- merge_df %>%
-    filter(region_length >= 2 * oligo_length) %>%
-    mutate(longregion_maxfit = floor(region_length / oligo_length))
-  probes_long_regions <- candidate_probes_screened %>%
-    bed_intersect(merge_df_long) %>%
-    mutate(longregion_id = paste0(start.y, ";", end.y)) %>%
-    dplyr::select(contains(".x"), longregion_id,  "longregion_maxfit" = longregion_maxfit.y, -contains(".overlap")) %>%
-    dplyr::rename_with(~ str_replace_all(.x, "\\.x", ""))
   
-  future_map_dfr(
-    unique(probes_long_regions$longregion_id) %>% set_names(),
-    function(longregion){
-      ## subset by "longregion_id"
-      subset <- probes_long_regions %>% filter(longregion_id == longregion)
-      subset_maxfit <- pull(subset, longregion_maxfit) %>% unique()
-      probe_midpoints <- subset %>% pull(centre_pos)
-      probe_dG_deviations <- subset %>% pull(dG_deviation)
-      probe_dG_deviations_halves <- subset %>% pull(dG_deviation_halves)
-      
-      ## iterate probe distributions over 1:maxfit number of probes
-      future_map_dfr(
-        set_names(1:subset_maxfit),
-        function(n_fit){
-          test_distr_combn(probe_midpoints = probe_midpoints, n_fit = n_fit, probe_spacing = probe_spacing)
-        }, .id = "n_fit"
-      ) %>%
-        mutate(longregion_maxfit = subset_maxfit) %>%
-        dplyr::select(longregion_maxfit, everything())
-    }, .id = "longregion_id"
-  )
-}
-
-
-
-## Overlapping probe distributor 
-distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, probe_spacing){
+  # For clarity in maximization, we use a positive score. A simple transformation works.
+  # A larger constant ensures all scores are positive if dG_deviation can be large.
+  probes_df <- probes_df %>%
+    mutate(score = 5000 - dG_deviation) 
   
-  merged_regions <- merge_df %>%
-    mutate(
-      potential_max_fit = floor((region_length + probe_spacing) / (oligo_length + probe_spacing))
-    )
+  # Sort probes by their end position.
+  probes_df <- probes_df %>%
+    arrange(end)
   
-  ### Distribute probes
-  if(nrow(merged_regions) == 0){
-    ### Error message when no probes are found
-    print("No probes found. Check blast outputs for any issues.")
-    
-  } else {
-    ### Loop around potential max fit of probes per merged regions
-    potential_max_fits <- unique(merged_regions$potential_max_fit) %>% sort()
-    distributed_probes_list <- list()
-    
-    for (i in potential_max_fits){
-      ### single fit
-      if(i == 1){
-        merged_subregions <- filter(merged_regions, potential_max_fit == i)
-        probes_subregions <- candidate_probes_screened %>%
-          bed_intersect(merged_subregions) %>%
-          group_by(start.y, end.y) %>%
-          slice_min(dG_deviation.x, n = 1) %>%
-          slice_min(dG_deviation_halves.x, n = 1) %>%
-          slice_min(start.x, n = 1) %>% ungroup() %>%
-          dplyr::select(-contains(".y"), -contains(".overlap")) %>%
-          dplyr::rename_with(~ str_replace_all(.x, ".x", ""))
-        distributed_probes_list[[i]] <- probes_subregions
-      } else if (i > 1 & i < 5) {
-        merged_subregions <- filter(merged_regions, potential_max_fit == i)
-        probes_subregions_overlapping <- candidate_probes_screened %>%
-          bed_intersect(merged_subregions) %>%
-          mutate(longregion_id = paste0(start.y, ";", end.y)) %>%
-          dplyr::select(contains(".x"), longregion_id, "potential_max_fit" = potential_max_fit.y, -contains(".overlap")) %>%
-          dplyr::rename_with(~ str_replace_all(.x, "\\.x", ""))
-        
-        probes_subregions_nonoverlapping <- unique(probes_subregions_overlapping$longregion_id) %>% 
-          purrr::set_names() %>%
-          future_map_dfr(
-            function(multifit_region){
-              ## subset by "longregion_id"
-              subset <- filter(probes_subregions_overlapping, longregion_id == multifit_region)
-              subset_maxfit <- i
-              probe_midpoints <- subset %>% pull(centre_pos)
-              probe_dG_deviations <- subset %>% pull(dG_deviation)
-              probe_dG_deviations_halves <- subset %>% pull(dG_deviation_halves)
-              
-              ## iterate probe distributions from potential maxfit number to single fit for each longregion_id
-              n_fit <- subset_maxfit
-              
-              combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
-              combinations_nonoverlapping <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
-              
-              while(length(combinations_nonoverlapping) == 0 & n_fit > 0){
-                n_fit <- n_fit - 1
-                combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
-                combinations_nonoverlapping <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
-              }
-              
-              if(length(combinations_nonoverlapping) == 0 & n_fit == 0){
-                tibble(
-                  midpoint_index = character(),
-                  sum_probe_dG_deviations = numeric(),
-                  sum_probe_dG_deviations_halves = numeric()
-                ) %>% return()
-              } else {
-                future_map_dfr(combinations_nonoverlapping,
-                               function(combination){
-                                 tibble(
-                                   midpoint_index = probe_midpoints[combination] %>% paste(collapse = "|"),
-                                   sum_probe_dG_deviations = probe_dG_deviations[combination] %>% sum(),
-                                   sum_probe_dG_deviations_halves = probe_dG_deviations_halves[combination] %>% sum()
-                                 )
-                               }) %>%
-                  slice_min(sum_probe_dG_deviations) %>%
-                  slice_min(sum_probe_dG_deviations_halves) %>%
-                  slice_head(n = 1) %>% return()
-              }
-            }, .id = "longregion_id"
-          )
-        
-        probes_subregions_nonoverlapping_tokeep <- probes_subregions_nonoverlapping %>%
-          group_by(longregion_id) %>%
-          # slice_max(n_fit) %>%
-          ungroup() %>%
-          pull(midpoint_index) %>%
-          paste(collapse = "|") %>%
-          str_split(pattern = "\\|") %>% pluck(1) %>% as.numeric()
-        
-        probes_subregions <- candidate_probes_screened %>%
-          filter(centre_pos %in% probes_subregions_nonoverlapping_tokeep)
-        
-        distributed_probes_list[[i]] <- probes_subregions
-      }
-      else if (i >= 5){
-        ### greedy algorithm if i>=5. Memory constrains :p 
-        merged_subregions <- filter(merged_regions, potential_max_fit == i)
-        probes_subregions_overlapping <- candidate_probes_screened %>%
-          bed_intersect(merged_subregions) %>%
-          mutate(longregion_id = paste0(start.y, ";", end.y)) %>%
-          dplyr::select(contains(".x"), longregion_id, "potential_max_fit" = potential_max_fit.y, -contains(".overlap")) %>%
-          dplyr::rename_with(~ str_replace_all(.x, "\\.x", ""))
-        
-        probes_subregions_overlapping_greedy <- probes_subregions_overlapping %>%
-          mutate(end = end + probe_spacing) %>%
-          arrange(end)
-        
-        greedy_df <- probes_subregions_overlapping_greedy
-        nonoverlapping_probes <- c()
-        while (nrow(greedy_df) > 0){
-          probe_slice <- slice_head(greedy_df, n = 1) 
-          probe_id <- pull(probe_slice, unique_id)
-          probe_end <- pull(probe_slice, end)
-          nonoverlapping_probes <- c(nonoverlapping_probes, probe_id)
-          greedy_df <- filter(greedy_df, start > probe_end)
-          
-          probes_subregions <- candidate_probes_screened %>%
-            filter(unique_id %in% nonoverlapping_probes)
-          
-          distributed_probes_list[[i]] <- probes_subregions
-        }
+  n <- nrow(probes_df)
+  
+  # Calculate p(i): the index of the latest non-overlapping probe for probe i.
+  # This O(n log n) step remains unchanged.
+  p <- integer(n)
+  ends <- probes_df$end
+  for (i in 2:n) {
+    required_end <- probes_df$start[i] - probe_spacing
+    if (required_end < ends[1]) {
+      p[i] <- 0
+      next
+    }
+    low <- 1; high <- i - 1; j <- 0
+    while(low <= high) {
+      mid <- floor((low + high) / 2)
+      if (ends[mid] <= required_end) {
+        j <- mid; low <- mid + 1
+      } else {
+        high <- mid - 1
       }
     }
+    p[i] <- j
   }
-  output <- purrr::reduce(distributed_probes_list, bind_rows) 
+  
+  # The DP table is now a list of solutions. Each solution is a named vector
+  # storing both the number of probes and the total score for that solution.
+  dp <- vector("list", n + 1)
+  # Base case: An empty set has 0 probes and a score of 0.
+  dp[[1]] <- c(num_probes = 0, score = 0)
+  
+  # --- Main DP Loop with Modified Logic ---
+  for (i in 1:n) {
+    # Option 1: The solution if we INCLUDE probe i.
+    pred_solution <- dp[[p[i] + 1]]
+    solution_with_i <- c(
+      num_probes = 1 + pred_solution[["num_probes"]],
+      score = probes_df$score[i] + pred_solution[["score"]]
+    )
+    
+    # Option 2: The solution if we EXCLUDE probe i (i.e., the best solution up to i-1).
+    solution_without_i <- dp[[i]]
+    
+    # --- Lexicographical Comparison ---
+    # 1. Prioritize the solution with more probes.
+    if (solution_with_i[["num_probes"]] > solution_without_i[["num_probes"]]) {
+      dp[[i + 1]] <- solution_with_i
+      # 2. If probe counts are equal, prioritize the one with a higher score.
+    } else if (solution_with_i[["num_probes"]] == solution_without_i[["num_probes"]] &&
+               solution_with_i[["score"]] > solution_without_i[["score"]]) {
+      dp[[i + 1]] <- solution_with_i
+      # 3. Otherwise, the previous solution (without probe i) is better or equal.
+    } else {
+      dp[[i + 1]] <- solution_without_i
+    }
+  }
+  
+  # Backtracking must also follow the same decision logic to reconstruct the path.
+  selected_indices <- c()
+  i <- n
+  while (i > 0) {
+    # Re-calculate the "solution_with_i" to compare against what's stored in dp[[i+1]]
+    pred_solution <- dp[[p[i] + 1]]
+    solution_with_i <- c(
+      num_probes = 1 + pred_solution[["num_probes"]],
+      score = probes_df$score[i] + pred_solution[["score"]]
+    )
+    
+    # We check if the optimal solution stored in dp[[i+1]] was achieved by including probe i.
+    # isTRUE(all.equal(...)) is a robust way to compare two numeric vectors.
+    if (isTRUE(all.equal(dp[[i + 1]], solution_with_i))) {
+      selected_indices <- c(i, selected_indices)
+      i <- p[i] # Jump to the next compatible probe in the optimal set
+    } else {
+      i <- i - 1 # This probe was not included, so move to the previous one
+    }
+  }
+  
+  # Return the full details of the probes in the optimal set.
+  return(probes_df[selected_indices, ])
 }
+
+#' Distribute Probes Across Overlapping Regions using Dynamic Programming
+#'
+#' This function takes all candidate probes, identifies contiguous regions of
+#' overlapping probes, and then uses a dynamic programming approach to find the
+#' optimal non-overlapping set for each region.
+#'
+#' @param candidate_probes_screened A dataframe of all candidate probes that passed previous filters.
+#' @param merge_df A dataframe of merged genomic intervals from `valr::bed_merge`.
+#' @param probe_spacing The minimum number of nucleotides between probes.
+#' @return A tibble containing the final, globally optimal set of non-overlapping probes.
+
+distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, probe_spacing){
+  
+  # Use bed_intersect to assign each probe to its corresponding merged region
+  probes_in_regions <- candidate_probes_screened %>%
+    valr::bed_intersect(merge_df) %>%
+    # Create a unique ID for each merged region to group by
+    mutate(region_id = paste(start.y, end.y, sep="-")) %>%
+    # Clean up column names after the intersect operation
+    dplyr::select(
+      -contains(".y"),
+      -contains(".overlap")
+    ) %>%
+    dplyr::rename_with(~ str_replace_all(.x, ".x", ""))
+  
+  # Split the dataframe into a list of dataframes, one for each region.
+  # This prepares the data for parallel processing.
+  probes_by_region <- probes_in_regions %>%
+    group_by(region_id) %>%
+    group_split()
+  
+  # Use furrr to apply the DP function to each region in parallel.
+  # This significantly speeds up the process if there are many distinct regions.
+  optimal_probes_list <- furrr::future_map(
+    probes_by_region,
+    ~ find_optimal_probe_set_dp(.x, probe_spacing)
+  )
+  
+  # Combine the lists of optimal probes from each region into a single dataframe.
+  final_probes <- bind_rows(optimal_probes_list)
+  
+  return(final_probes)
+}
+
+# get_probes_shortregions <- function(candidate_probes_screened, merge_df){
+#   merge_df_short <- merge_df %>%
+#     filter(region_length < 2 * oligo_length)
+#   probes_short_regions <- candidate_probes_screened %>%
+#     bed_intersect(merge_df_short) %>%
+#     group_by(start.y, end.y) %>%
+#     slice_min(dG_deviation.x, n = 1) %>%
+#     slice_min(dG_deviation_halves.x, n = 1) %>%
+#     slice_min(start.x, n = 1) %>% ungroup() %>%
+#     dplyr::select(-contains(".y"), -contains(".overlap")) %>%
+#     dplyr::rename_with(~ str_replace_all(.x, ".x", "")) %>%
+#     return()
+# }
+# 
+# 
+# test_distr_combn <- function(probe_midpoints, n_fit, probe_spacing){
+#   
+#   combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
+#   combinations_nonoverlapping <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
+#   if(length(combinations_nonoverlapping) == 0) {
+#     tibble(
+#       midpoint_index = character(),
+#       sum_probe_dG_deviations = numeric(),
+#       sum_probe_dG_deviations_halves = numeric()
+#     ) %>% return()
+#   } else {
+#     future_map_dfr(combinations_nonoverlapping,
+#                    function(combination){
+#                      tibble(
+#                        midpoint_index = probe_midpoints[combination] %>% paste(collapse = "|"),
+#                        sum_probe_dG_deviations = probe_dG_deviations[combination] %>% sum(),
+#                        sum_probe_dG_deviations_halves = probe_dG_deviations_halves[combination] %>% sum()
+#                      )
+#                    }) %>%
+#       slice_min(sum_probe_dG_deviations) %>%
+#       slice_min(sum_probe_dG_deviations_halves) %>%
+#       slice_head(n = 1)
+#   }
+# }
+# 
+# 
+# 
+# 
+# distribute_probes_longregions <- function(candidate_probes_screened, merge_df, probe_spacing){
+#   merge_df_long <- merge_df %>%
+#     filter(region_length >= 2 * oligo_length) %>%
+#     mutate(longregion_maxfit = floor(region_length / oligo_length))
+#   probes_long_regions <- candidate_probes_screened %>%
+#     bed_intersect(merge_df_long) %>%
+#     mutate(longregion_id = paste0(start.y, ";", end.y)) %>%
+#     dplyr::select(contains(".x"), longregion_id,  "longregion_maxfit" = longregion_maxfit.y, -contains(".overlap")) %>%
+#     dplyr::rename_with(~ str_replace_all(.x, "\\.x", ""))
+#   
+#   future_map_dfr(
+#     unique(probes_long_regions$longregion_id) %>% set_names(),
+#     function(longregion){
+#       ## subset by "longregion_id"
+#       subset <- probes_long_regions %>% filter(longregion_id == longregion)
+#       subset_maxfit <- pull(subset, longregion_maxfit) %>% unique()
+#       probe_midpoints <- subset %>% pull(centre_pos)
+#       probe_dG_deviations <- subset %>% pull(dG_deviation)
+#       probe_dG_deviations_halves <- subset %>% pull(dG_deviation_halves)
+#       
+#       ## iterate probe distributions over 1:maxfit number of probes
+#       future_map_dfr(
+#         set_names(1:subset_maxfit),
+#         function(n_fit){
+#           test_distr_combn(probe_midpoints = probe_midpoints, n_fit = n_fit, probe_spacing = probe_spacing)
+#         }, .id = "n_fit"
+#       ) %>%
+#         mutate(longregion_maxfit = subset_maxfit) %>%
+#         dplyr::select(longregion_maxfit, everything())
+#     }, .id = "longregion_id"
+#   )
+# }
+# 
+# 
+# 
+# ## Overlapping probe distributor 
+# distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, probe_spacing){
+#   
+#   merged_regions <- merge_df %>%
+#     mutate(
+#       potential_max_fit = floor((region_length + probe_spacing) / (oligo_length + probe_spacing))
+#     )
+#   
+#   ### Distribute probes
+#   if(nrow(merged_regions) == 0){
+#     ### Error message when no probes are found
+#     print("No probes found. Check blast outputs for any issues.")
+#     
+#   } else {
+#     ### Loop around potential max fit of probes per merged regions
+#     potential_max_fits <- unique(merged_regions$potential_max_fit) %>% sort()
+#     distributed_probes_list <- list()
+#     
+#     for (i in potential_max_fits){
+#       ### single fit
+#       if(i == 1){
+#         merged_subregions <- filter(merged_regions, potential_max_fit == i)
+#         probes_subregions <- candidate_probes_screened %>%
+#           bed_intersect(merged_subregions) %>%
+#           group_by(start.y, end.y) %>%
+#           slice_min(dG_deviation.x, n = 1) %>%
+#           slice_min(dG_deviation_halves.x, n = 1) %>%
+#           slice_min(start.x, n = 1) %>% ungroup() %>%
+#           dplyr::select(-contains(".y"), -contains(".overlap")) %>%
+#           dplyr::rename_with(~ str_replace_all(.x, ".x", ""))
+#         distributed_probes_list[[i]] <- probes_subregions
+#       } else if (i > 1 & i < 5) {
+#         merged_subregions <- filter(merged_regions, potential_max_fit == i)
+#         probes_subregions_overlapping <- candidate_probes_screened %>%
+#           bed_intersect(merged_subregions) %>%
+#           mutate(longregion_id = paste0(start.y, ";", end.y)) %>%
+#           dplyr::select(contains(".x"), longregion_id, "potential_max_fit" = potential_max_fit.y, -contains(".overlap")) %>%
+#           dplyr::rename_with(~ str_replace_all(.x, "\\.x", ""))
+#         
+#         probes_subregions_nonoverlapping <- unique(probes_subregions_overlapping$longregion_id) %>% 
+#           purrr::set_names() %>%
+#           future_map_dfr(
+#             function(multifit_region){
+#               ## subset by "longregion_id"
+#               subset <- filter(probes_subregions_overlapping, longregion_id == multifit_region)
+#               subset_maxfit <- i
+#               probe_midpoints <- subset %>% pull(centre_pos)
+#               probe_dG_deviations <- subset %>% pull(dG_deviation)
+#               probe_dG_deviations_halves <- subset %>% pull(dG_deviation_halves)
+#               
+#               ## iterate probe distributions from potential maxfit number to single fit for each longregion_id
+#               n_fit <- subset_maxfit
+#               
+#               combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
+#               combinations_nonoverlapping <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
+#               
+#               while(length(combinations_nonoverlapping) == 0 & n_fit > 0){
+#                 n_fit <- n_fit - 1
+#                 combinations <- combn(length(probe_midpoints), n_fit, simplify = FALSE)
+#                 combinations_nonoverlapping <- keep(combinations, ~ probe_midpoints[.x] %>% dist() %>% min() >= 52 + probe_spacing)
+#               }
+#               
+#               if(length(combinations_nonoverlapping) == 0 & n_fit == 0){
+#                 tibble(
+#                   midpoint_index = character(),
+#                   sum_probe_dG_deviations = numeric(),
+#                   sum_probe_dG_deviations_halves = numeric()
+#                 ) %>% return()
+#               } else {
+#                 future_map_dfr(combinations_nonoverlapping,
+#                                function(combination){
+#                                  tibble(
+#                                    midpoint_index = probe_midpoints[combination] %>% paste(collapse = "|"),
+#                                    sum_probe_dG_deviations = probe_dG_deviations[combination] %>% sum(),
+#                                    sum_probe_dG_deviations_halves = probe_dG_deviations_halves[combination] %>% sum()
+#                                  )
+#                                }) %>%
+#                   slice_min(sum_probe_dG_deviations) %>%
+#                   slice_min(sum_probe_dG_deviations_halves) %>%
+#                   slice_head(n = 1) %>% return()
+#               }
+#             }, .id = "longregion_id"
+#           )
+#         
+#         probes_subregions_nonoverlapping_tokeep <- probes_subregions_nonoverlapping %>%
+#           group_by(longregion_id) %>%
+#           # slice_max(n_fit) %>%
+#           ungroup() %>%
+#           pull(midpoint_index) %>%
+#           paste(collapse = "|") %>%
+#           str_split(pattern = "\\|") %>% pluck(1) %>% as.numeric()
+#         
+#         probes_subregions <- candidate_probes_screened %>%
+#           filter(centre_pos %in% probes_subregions_nonoverlapping_tokeep)
+#         
+#         distributed_probes_list[[i]] <- probes_subregions
+#       }
+#       else if (i >= 5){
+#         ### greedy algorithm if i>=5. Memory constrains :p 
+#         merged_subregions <- filter(merged_regions, potential_max_fit == i)
+#         probes_subregions_overlapping <- candidate_probes_screened %>%
+#           bed_intersect(merged_subregions) %>%
+#           mutate(longregion_id = paste0(start.y, ";", end.y)) %>%
+#           dplyr::select(contains(".x"), longregion_id, "potential_max_fit" = potential_max_fit.y, -contains(".overlap")) %>%
+#           dplyr::rename_with(~ str_replace_all(.x, "\\.x", ""))
+#         
+#         probes_subregions_overlapping_greedy <- probes_subregions_overlapping %>%
+#           mutate(end = end + probe_spacing) %>%
+#           arrange(end)
+#         
+#         greedy_df <- probes_subregions_overlapping_greedy
+#         nonoverlapping_probes <- c()
+#         while (nrow(greedy_df) > 0){
+#           probe_slice <- slice_head(greedy_df, n = 1) 
+#           probe_id <- pull(probe_slice, unique_id)
+#           probe_end <- pull(probe_slice, end)
+#           nonoverlapping_probes <- c(nonoverlapping_probes, probe_id)
+#           greedy_df <- filter(greedy_df, start > probe_end)
+#           
+#           probes_subregions <- candidate_probes_screened %>%
+#             filter(unique_id %in% nonoverlapping_probes)
+#           
+#           distributed_probes_list[[i]] <- probes_subregions
+#         }
+#       }
+#     }
+#   }
+#   output <- purrr::reduce(distributed_probes_list, bind_rows) 
+# }
 
 cull_excess_pairs <- function(df, max_probe_pairs = max_probe_pairs){
   if(nrow(df) <= max_probe_pairs){

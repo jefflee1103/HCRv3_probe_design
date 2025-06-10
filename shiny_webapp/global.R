@@ -20,6 +20,11 @@ library(Biostrings)
 library(metablastr)
 library(valr)
 
+# For C++ integration
+library(Rcpp)
+
 # Custom functions for the probe design
 source("R/HCR_design_shiny.R")
 
+# Source the C++ functions
+sourceCpp("R/thermo_calc.cpp")

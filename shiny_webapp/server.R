@@ -81,14 +81,12 @@ server <- function(input, output, session) {
       showNotification("Calculating thermodynamic parameters (this may take a moment)...", id = "thermo_calc", type = "message")
       
       # Set up parallel processing and run thermodynamic calculations
-      plan(multisession, workers = input$n_threads)
       thermodynamics <- get_thermodynamic_parameters(candidate_probes(), 37, 0.3, 5e-5)
       
       # Annotate the candidate probes with the calculated thermo properties
       annotated_probes <- annotate_probes(candidate_probes(), thermodynamics)
       annotated_candidate_probes(annotated_probes)
-      plan(sequential) # End parallel session
-      
+
       # Generate and store exploratory plots for the thermo data
       explore_plots <- generate_exploratory_plots(annotated_probes, c("Tm", "dG", "GC_content"))
       exploratory_plots(explore_plots)
@@ -98,7 +96,6 @@ server <- function(input, output, session) {
       updateTabsetPanel(session, "results_tabs", selected = "Thermo Filtering")
       
     }, error = function(e) {
-      plan(sequential)
       removeNotification("thermo_calc")
       showNotification(paste("Error:", e$message), type = "error", duration = 10)
     })
