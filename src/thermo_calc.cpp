@@ -39,7 +39,6 @@ Rcpp::List calculate_thermodynamics_cpp(std::string seq, double temperature, dou
     std::string dinucleotide = seq.substr(i, 2);
     
     // 2. Use the .at() method in a try-catch block for safe lookups.
-    // This gives a much better error message if an invalid character is found.
     try {
       total_delH += delH_map.at(dinucleotide);
       total_delS += delS_map.at(dinucleotide);

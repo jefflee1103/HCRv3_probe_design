@@ -4,6 +4,7 @@
 # For the Shiny framework
 library(shiny)
 library(shinythemes) # To make the app look nice
+# library(shinyFiles) # To make file path locating easier with local runs
 
 # For data manipulation and plotting
 library(tidyverse)
@@ -24,7 +25,7 @@ library(valr)
 library(Rcpp)
 
 # Custom functions for the probe design
-source("R/HCR_design_shiny.R")
+source("../src/HCR_design_shiny.R")
 
 # Source the C++ functions
-sourceCpp("R/thermo_calc.cpp")
+sourceCpp("../src/thermo_calc.cpp")

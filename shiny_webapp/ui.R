@@ -16,7 +16,7 @@ ui <- navbarPage(
            fluidRow(
              column(width = 8, offset = 2,
                     # For this to work, place home.md in the app's root directory.
-                    includeMarkdown("markdowns/home.md") 
+                    includeMarkdown("www/markdowns/home.md") 
              )
            )
   ),
@@ -44,9 +44,31 @@ ui <- navbarPage(
                # --- Section 2: Thermodynamics Filtering ---
                h4("2. Thermodynamics Filtering"),
                wellPanel(
+                 # --- Melting Temperature ---
                  sliderInput("Tm_range", "Melting Temperature (°C):", min = 20, max = 100, value = c(60, 90), step = 1),
+                 fluidRow(
+                   column(6, numericInput("Tm_min", "Min:", value = 60, min = 20, max = 100, step = 1)),
+                   column(6, numericInput("Tm_max", "Max:", value = 90, min = 20, max = 100, step = 1))
+                 ),
+                 hr(), # Visual separator
+                 
+                 # --- Gibbs Free Energy ---
                  sliderInput("dG_range", "Probe-Target dG (kcal/mol):", min = -120, max = -30, value = c(-100, -60), step = 1),
+                 fluidRow(
+                   column(6, numericInput("dG_min", "Min:", value = -100, min = -120, max = -30, step = 1)),
+                   column(6, numericInput("dG_max", "Max:", value = -60, min = -120, max = -30, step = 1))
+                 ),
+                 hr(), # Visual separator
+                 
+                 # --- GC Content ---
                  sliderInput("GC_range", "GC Content (Proportion):", min = 0.1, max = 0.9, value = c(0.4, 0.6), step = 0.01),
+                 fluidRow(
+                   column(6, numericInput("GC_min", "Min:", value = 0.4, min = 0.1, max = 0.9, step = 0.01)),
+                   column(6, numericInput("GC_max", "Max:", value = 0.6, min = 0.1, max = 0.9, step = 0.01))
+                 ),
+                 hr(), # Visual separator
+                 
+                 # --- Other existing inputs ---
                  numericInput("target_dG", "Target dG (Pair):", value = -80),
                  numericInput("target_dG_halves", "Target dG (Halves):", value = -38),
                  checkboxInput("pass_a_comp", "Filter by A-composition", value = TRUE),
@@ -61,11 +83,32 @@ ui <- navbarPage(
                h4("3. BLAST Running"),
                wellPanel(
                  textInput("blast_db_path", "Path to BLAST Database:", value = "~/Documents/Data/BLAST/Dmel/Dmel_BLASTdb_ens99.fa"),
-                 textInput("tx2gene_path", "Path to Tx2gene map (.csv):", value = "../data/Dmel_tx2gene_ENSEMBL_v99.csv"),
+                 textInput("tx2gene_path", "Path to Tx2gene map (.csv):", value = "../data/BLAST/tx2gene/Dmel_tx2gene_ENSEMBL_v99.csv"),
                  numericInput("blast_evalue", "BLAST E-value Cutoff:", value = 0.1, min = 0),
                  checkboxInput("allowOverlapBreakRegion", "Allow overlap spanning the 25/25 break region", value = TRUE),
                  actionButton("run_blast", "Run BLAST", icon = icon("searchengin"), width = "100%")
                ),
+               # h4("3. BLAST Running"),
+               # wellPanel(
+               #   # Button to select BLAST database
+               #   shinyFilesButton("blast_db_path", "Select BLAST DB", "Select BLAST database file", multiple = FALSE),
+               #   h6("Selected DB fasta:"),
+               #   verbatimTextOutput("blast_db_display", placeholder = TRUE),
+               #   
+               #   hr(), # Visual separator
+               #   
+               #   # Button to select Tx2gene map
+               #   shinyFilesButton("tx2gene_path", "Select Tx2gene csv", "Select tx2gene map file (.csv)", multiple = FALSE),
+               #   h6("Selected Tx2gene csv:"),
+               #   verbatimTextOutput("tx2gene_display", placeholder = TRUE),
+               #   
+               #   hr(), # Visual separator
+               #   
+               #   numericInput("blast_evalue", "BLAST E-value Cutoff:", value = 0.1, min = 0),
+               #   checkboxInput("allowOverlapBreakRegion", "Allow overlap spanning the 25/25 break region", value = TRUE),
+               #   actionButton("run_blast", "Run BLAST", icon = icon("searchengin"), width = "100%")
+               # ),
+               
                
                # --- Section 4: BLAST Screening ---
                h4("4. BLAST Screening"),
@@ -95,7 +138,7 @@ ui <- navbarPage(
                  tabPanel("Instructions",
                           # This will look for the file in a 'markdowns' sub-folder.
                           # You must create this folder in your app's root directory.
-                          includeMarkdown("markdowns/hcrv3_instruction.md")
+                          includeMarkdown("www/markdowns/hcrv3_instruction.md")
                  ),
                  
                  # --- Subsequent Results Tabs ---
@@ -113,7 +156,7 @@ ui <- navbarPage(
                  ),
                  tabPanel("BLAST Screening",
                           h4("BLAST Match Distribution"),
-                          plotOutput("blast_summary_histogram", height = "400px"),
+                          plotOutput("blast_summary_histogram", height = "400px", width = "70%"),
                           hr(),
                           h4("BLAST Summary Table"),
                           DT::dataTableOutput("blast_summary_table"),

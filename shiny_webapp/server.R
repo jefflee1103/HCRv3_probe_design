@@ -28,7 +28,7 @@ server <- function(input, output, session) {
   
   
   # --- 2. Process Sequence on File Upload ---
-  # This observer triggers automatically when a user uploads a FASTA file.
+  # --- This observer triggers automatically when a user uploads a FASTA file.
   observeEvent(input$target_fasta, {
     req(input$target_fasta, input$target_name) # Ensure file and name are provided
     
@@ -73,7 +73,7 @@ server <- function(input, output, session) {
   
   
   # --- 3. Calculate Thermodynamics ---
-  # This observer triggers when the "Calculate Thermodynamics" button is clicked.
+  # --- This observer triggers when the "Calculate Thermodynamics" button is clicked.
   observeEvent(input$run_thermo_calc, {
     req(candidate_probes(), input$n_threads) # Requires candidate probes to exist
     
@@ -103,7 +103,40 @@ server <- function(input, output, session) {
   
   
   # --- 4. Thermodynamics Filtering ---
-  # This observer triggers when the "Run Thermo Filter" button is clicked.
+  
+  # --- Slider and Numeric Input Synchronization
+  observeEvent(c(input$Tm_min, input$Tm_max), {
+    req(input$Tm_min, input$Tm_max, input$Tm_min < input$Tm_max)
+    updateSliderInput(session, "Tm_range", value = c(input$Tm_min, input$Tm_max))
+  })
+  
+  observeEvent(input$Tm_range, {
+    updateNumericInput(session, "Tm_min", value = input$Tm_range[1])
+    updateNumericInput(session, "Tm_max", value = input$Tm_range[2])
+  })
+  
+  observeEvent(c(input$dG_min, input$dG_max), {
+    req(input$dG_min, input$dG_max, input$dG_min < input$dG_max)
+    updateSliderInput(session, "dG_range", value = c(input$dG_min, input$dG_max))
+  })
+  
+  observeEvent(input$dG_range, {
+    updateNumericInput(session, "dG_min", value = input$dG_range[1])
+    updateNumericInput(session, "dG_max", value = input$dG_range[2])
+  })
+  
+  observeEvent(c(input$GC_min, input$GC_max), {
+    req(input$GC_min, input$GC_max, input$GC_min < input$GC_max)
+    updateSliderInput(session, "GC_range", value = c(input$GC_min, input$GC_max))
+  })
+  
+  observeEvent(input$GC_range, {
+    updateNumericInput(session, "GC_min", value = input$GC_range[1])
+    updateNumericInput(session, "GC_max", value = input$GC_range[2])
+  })
+  
+  
+  # --- This observer triggers when the "Run Thermo Filter" button is clicked.
   observeEvent(input$run_thermo_filter, {
     req(annotated_candidate_probes()) # Requires annotated probes
     showNotification("Filtering probes based on parameters...", type = "message")
@@ -148,7 +181,7 @@ server <- function(input, output, session) {
       thermo_filtered_probes(filt_df)
       
       # Generate a plot showing the positions of the filtered probes
-      filtered_plot <- plot_inspection(df = filt_df, all_candidates = candidate_probes(), colour_param = "Tm")
+      filtered_plot <- plot_inspection(df = filt_df, all_candidates = candidate_probes(), colour_param = "Tm", target_name = input$target_name)
       filtered_probes_plot(filtered_plot)
     }
     
@@ -160,7 +193,45 @@ server <- function(input, output, session) {
   
   
   # --- 5. Run BLAST ---
-  # This observer triggers when the "Run BLAST" button is clicked.
+  
+  # # --- shinyFiles Logic for BLAST 
+  # 
+  # # Define root volumes for file access. For local use, 'Home' is sufficient.
+  # # C: is added for Windows compatibility.
+  # volumes <- c(Home = fs::path_home(), "C:" = "C:/")
+  # 
+  # # Server-side logic for the BLAST database file selection
+  # shinyFileChoose(input, "blast_db_path", roots = volumes, session = session, filetypes = c('fa', 'fasta', ''))
+  # 
+  # # Server-side logic for the tx2gene map file selection
+  # shinyFileChoose(input, "tx2gene_path", roots = volumes, session = session, filetypes = c('csv'))
+  # 
+  # # Reactive expressions to store the selected paths
+  # # These reactives will hold the parsed file path strings.
+  # blast_db_filepath <- reactive({
+  #   req(input$blast_db_path)
+  #   parseFilePaths(volumes, input$blast_db_path)$datapath
+  # })
+  # 
+  # tx2gene_filepath <- reactive({
+  #   req(input$tx2gene_path)
+  #   parseFilePaths(volumes, input$tx2gene_path)$datapath
+  # })
+  # 
+  # # Observers to display the selected paths in the UI
+  # # Display selected BLAST DB path
+  # output$blast_db_display <- renderText({
+  #   req(blast_db_filepath())
+  #   blast_db_filepath()
+  # })
+  # 
+  # # Display selected tx2gene map path
+  # output$tx2gene_display <- renderText({
+  #   req(tx2gene_filepath())
+  #   tx2gene_filepath()
+  # })
+  
+  # --- This observer triggers when the "Run BLAST" button is clicked.
   observeEvent(input$run_blast, {
     req(thermo_filtered_probes(), input$blast_db_path, input$tx2gene_path) # Requires filtered probes and paths
     showNotification("Running BLASTn against filtered probes (this may take a long time)...", id = "blast_run", type = "message", duration = NULL)
@@ -176,8 +247,9 @@ server <- function(input, output, session) {
       
       # Create a histogram of the number of BLAST matches
       summary_hist <- ggplot(summary_data, aes(x = n_matches)) + 
-        geom_histogram(binwidth = 1, fill = "seagreen3", alpha = 0.7, colour = "black") + 
+        geom_histogram(binwidth = 1, fill = "royalblue3", alpha = 0.7, colour = "black") + 
         labs(title = "Distribution of BLAST Matches per Probe", x = "Number of Matches", y = "Probe Count") + 
+        scale_x_continuous(breaks = scales::breaks_width(1)) +
         theme_minimal()
       blast_summary_plot(summary_hist)
       
@@ -191,9 +263,45 @@ server <- function(input, output, session) {
     })
   })
   
+  # observeEvent(input$run_blast, {
+  #   req(thermo_filtered_probes(), blast_db_filepath(), tx2gene_filepath()) # Requires filtered probes and paths
+  #   showNotification("Running BLASTn against filtered probes (this may take a long time)...", id = "blast_run", type = "message", duration = NULL)
+  #   
+  #   tryCatch({
+  #     # The 'run_blastn_short' function now uses the reactive filepaths
+  #     blast_output <- run_blastn_short(
+  #       df = thermo_filtered_probes(), 
+  #       db = blast_db_filepath(), 
+  #       tx2gene = tx2gene_filepath(), 
+  #       cores = input$n_threads
+  #     )
+  #     blast_results(blast_output)
+  #     
+  #     # Summarize the raw BLAST output to count off-target hits per probe
+  #     summary_data <- summarise_blast_output(blast_output = blast_output, allowOverlapBreakRegion = input$allowOverlapBreakRegion, evalue_cutoff = input$blast_evalue, consider_pseudogene = input$consider_pseudogene)
+  #     blast_summary_data(summary_data)
+  #     
+  #     # Create a histogram of the number of BLAST matches
+  #     summary_hist <- ggplot(summary_data, aes(x = n_matches)) + 
+  #       geom_histogram(binwidth = 1, fill = "royalblue3", alpha = 0.7, colour = "black") + 
+  #       labs(title = "Distribution of BLAST Matches per Probe", x = "Number of Matches", y = "Probe Count") + 
+  #       scale_x_continuous(breaks = scales::breaks_width(1)) + 
+  #       theme_minimal()
+  #     blast_summary_plot(summary_hist)
+  #     
+  #     removeNotification("blast_run")
+  #     showNotification("BLAST run and summarisation complete.", type = "default")
+  #     updateTabsetPanel(session, "results_tabs", selected = "BLAST Screening")
+  #     
+  #   }, error = function(e) {
+  #     removeNotification("blast_run")
+  #     showNotification(paste("BLAST Error:", e$message), type = "error", duration = 10)
+  #   })
+  # })
+  
   
   # --- 6. Screen with BLAST Results ---
-  # This observer triggers when the "Run BLAST Screen" button is clicked.
+  # --- This observer triggers when the "Run BLAST Screen" button is clicked.
   observeEvent(input$run_blast_screen, {
     req(blast_summary_data(), thermo_filtered_probes()) # Requires BLAST summary
     showNotification("Screening probes based on BLAST results...", type = "message")
@@ -216,7 +324,7 @@ server <- function(input, output, session) {
       showNotification(paste("Screening complete.", nrow(screened_probes_df), "probes passed."), type = "default")
       
       # Generate a plot of the BLAST-screened probes
-      screened_plot <- plot_inspection(df = screened_probes_df, all_candidates = candidate_probes(), colour_param = "dG")
+      screened_plot <- plot_inspection(df = screened_probes_df, all_candidates = candidate_probes(), colour_param = "Tm", target_name = input$target_name)
       blast_screened_plot(screened_plot)
     }
   })
@@ -250,7 +358,7 @@ server <- function(input, output, session) {
       final_probe_set(final_probes_with_initiators)
       
       # Generate the final probe map plot
-      map_plot <- plot_final_probes(df = culled_probes, all_candidates = candidate_probes(), colour_param = "dG")
+      map_plot <- plot_final_probes(df = culled_probes, all_candidates = candidate_probes(), colour_param = "dG", target_name = input$target_name)
       probe_map_plot(map_plot)
       
       removeNotification("probe_config")

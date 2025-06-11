@@ -8,30 +8,26 @@ editor_options:
 
 ## Update
 
-Modified: 2022.09.20
+Modified: 2024.01.06
 
 ## Environment
 
-Requires installation of blastn using conda (see README.md).
+Requires installation of blastn (see README.md).
 
 ```{r}
 ## ---- R packages 
 library(tidyverse) 
+library(Rcpp)
 library(furrr) 
 library(patchwork) 
 library(valr) 
 library(Biostrings) # Bioconductor
-library(rBLAST) # Github
+library(metablastr) # Github
 
 ## ---- Load functions
-source("./R/HCR_design.R")
-
-## ---- Add BLAST installation to PATH
-## The PATH edit only temporarily applies to this QMD, so this code should be run each session.
-conda_blast_bin <- "/opt/miniconda3/envs/BLAST/bin" # find this directory
-Sys.setenv(PATH = paste(Sys.getenv("PATH"), conda_blast_bin, sep = .Platform$path.sep))
-Sys.getenv("PATH")
-Sys.which("blastn")
+source("./src/HCR_design.R")
+sourceCpp("./src/thermo_calc.cpp")
+Sys.which("blastn") # check R can find the BLAST installation
 
 ## ---- Set up multi-threading to speed up some calculation
 n_threads <- 4
@@ -45,17 +41,17 @@ plan(multisession, workers = n_threads)
 This chunk will take a FASTA file as input. To prevent probe design across exon-intron junctions do either of the following:
 
   (1) Put character N between exons in case of one single fasta entry; or
-  (2) Set each exon as separate fasta entry in a single fasta file. 
+  (2) Set each exon as separate fasta entries in a single fasta file. 
   
 Alternatively, assign target sequence (character class) to 'target_raw'. 
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/HBV_pgRNA-specific_sequence.fa" 
-target_name <- "HBV-pgRNA"
+fasta_file <- "./input/Dmel_pros-RL_exon_cleaned.fa" 
+target_name <- "cip4-exon"
 
 ## ---- Get target RNA sequence
-target_fasta <- readDNAStringSet(fasta_file)
+target_fasta <- readBStringSet(fasta_file)
 target_raw <- paste(target_fasta, collapse = "N")
 
 ## ---- Prepare target RNA sequence
@@ -66,14 +62,13 @@ target_sequence_total_length <- nchar(target)
 candidate_probes <- generate_candidate_probes(target_seq   = target,
                                               oligo_length = 52)
 ## ---- Inspect
-inspect_probe_prep(candidate_probes)
+inspect_probe_prep(candidate_probes, target, target_name)
+
 
 ```
 
 
 ## Calculate thermodynamic and sequence composition parameters for candidate probes 
-
-TODO: add hairpin_dG, homodimer_dG calculations as in MK's ribopop design?
 
 ```{r}
 ## ---- Set the hybridisation condition
@@ -87,80 +82,79 @@ thermodynamics <- get_thermodynamic_parameters(candidate_probes, temperature, Na
 ## ---- Annotate candidate sequences 
 candidate_probes_annotated <- annotate_probes(candidate_probes, thermodynamics)
 
+## ---- Generate exploratory plots
+generate_exploratory_plots(
+  candidate_probes_annotated, 
+  c("Tm", "dG", "GC_content")
+)
+
 ```
 
 ## Filter based on thermodynamics / base composition parameters 
 
-- Raj lab HCR (52nt)
- - dG [-70, -50] https://journals.asm.org/doi/10.1128/mbio.03751-21 
-- Sakura-Spengler lab (25nt) 
- - GC [37, 85]
- - Tm [55, 77]
-- Oligostan 26-32nt
- - dG -32
- - GC [40, 60]
- - Nucleotide composition rules
-
-```{r}
-## ---- Generate exploratory plots
-c("Tm", "dG", "GC_content") %>% generate_exploratory_plots()
-
-```
-
-```{r}
-## ---- Set filtering parameters
-target_dG <- -60
-target_dG_halves <- -32
-dG_range <- c(-75, -50)
-Tm_range <- c(10, 100)
-GC_range <- c(0.4, 0.7)
-pass_a_comp       <- FALSE
-pass_c_comp       <- FALSE
+Default parameters: 
+target_dG <- -80
+target_dG_halves <- -38
+dG_range <- c(-100, -60)
+Tm_range <- c(60, 90)
+GC_range <- c(0.4, 0.6)
+pass_a_comp       <- TRUE
+pass_c_comp       <- TRUE
 pass_a_stack      <- TRUE
 pass_c_stack      <- TRUE
 pass_c_spec_stack <- TRUE
+
+```{r}
+## ---- Set filtering parameters
+target_dG <- -80
+target_dG_halves <- -38
+dG_range <- c(-100, -60)
+Tm_range <- c(60, 90)
+GC_range <- c(0.4, 0.6)
+pass_a_comp       <- TRUE
+pass_c_comp       <- FALSE # stringent one
+pass_a_stack      <- TRUE
+pass_c_stack      <- TRUE
+pass_c_spec_stack <- TRUE # stringent one
 
 ## ---- Filter based on thermodynamic/nucleotide compositions
 candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
 
 ## ---- Inspect filtered probes
-plot_inspection(candidate_probes_filtered, "Tm")
+plot_inspection(candidate_probes_filtered, candidate_probes, "Tm")
 
 ```
 
 
 ## BLAST screen
 
-BLAST screen with short blastn mode.
+BLAST screen with short blastn mode. (evalue cutoff 0.1 default?)
 RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
 ## ---- Set params
-blast_file <- "~/Documents/BLAST/Hsap/Hsap_ens99_from-MK.fa"
-tx2gene_csv <- "./data/Hsap_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
-max_blast_matches <- 5 # Max number of BLAST hits
+blast_file <- "~/Documents/Data/BLAST/Dmel/Dmel_BLASTdb_ens99.fa"
+tx2gene_csv <- "./data/BLAST/tx2gene/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+evalue_cutoff <- 0.1 # smaller the value the more lenient
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
-## ---- Set up blast environment
-db <- blast(db = blast_file)
+## ---- BLAST nucleotide (this bit takes time)
+blast_output <- run_blastn_short(df = candidate_probes_filtered, db = blast_file, tx2gene = tx2gene_csv)
 
-## ---- Get sequences of filtered candidate target_sequence 
-seqs <- DNAStringSet(candidate_probes_filtered$target_sequence)
-names(seqs) <- candidate_probes_filtered$unique_id
+## ---- Choose BLAST threshold
+max_blast_matches <- 1 # Max number of BLAST hits
+consider_pseudogene <- FALSE # are you considering pseudogenes?
 
-## ---- BLAST nucleotide
-blast_output <- run_blastn_short(db, seqs, tx2gene_csv)
-blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion)
+blast_summary <- summarise_blast_output(blast_output, allowOverlapBreakRegion, evalue_cutoff = evalue_cutoff, consider_pseudogene)
 
 ggplot(blast_summary, aes(n_matches)) + geom_histogram(binwidth = 1)
 
-## ---- Screen candidate probes
+## ---- Screen and inspect candidate probes
 blast_screened <- screen_with_blast_summary(candidate_probes_filtered, max_blast_matches, blast_summary)
 candidate_probes_screened <- blast_screened[[1]]
 merge_df <- blast_screened[[2]]
 
-## ---- Inspect BLAST screened probes
-plot_inspection(candidate_probes_screened, "Tm") +
+plot_inspection(candidate_probes_screened, candidate_probes, "Tm") +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
       colour = "gray40", size = 2,
@@ -173,16 +167,20 @@ plot_inspection(candidate_probes_screened, "Tm") +
 ```{r}
 ## ---- Set params
 probe_spacing <- 3
+max_probe_pairs <- 30 # 33 is max pair count for IDT oPools cheap configuration
 
 ## ---- Get final non-overlapping screened candidate probes 
 candidate_probes_final <- distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing)
+candidate_probes_final <- cull_excess_pairs(candidate_probes_final, max_probe_pairs)
 
 ## ---- Inspect
-plot_inspection(candidate_probes_final, "Tm") +
+plot_inspection(candidate_probes_final, candidate_probes, "Tm") +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
       colour = "gray40", size = 2,
-      inherit.aes = FALSE)
+      inherit.aes = FALSE) + 
+  labs(subtitle = paste0(nrow(candidate_probes_final)," Non-overlapping probes")) + 
+  theme_bw()
 
 ```
 
@@ -197,7 +195,7 @@ Attach HCR B1/B2/B3/B4/B5 split initiator sequences to selected probe sequences 
 b_identifier <- "B1"
 
 ## ---- Attach hairpin sequences and save 
-probe_details <- attach_hcr_initiatior(candidate_probes_final, b_identifier = b_identifier)
+probe_details <- attach_hcr_initiatior(candidate_probes_final, b_identifier = b_identifier, target_name = target_name)
 probes <- get_final_probe_sequences(probe_details)
 
 ```
@@ -213,7 +211,9 @@ if(!dir.exists(output_dir)){dir.create(output_dir)}
 export_outputs(output_dir, probe_details, probes, blast_output)
 
 ## ---- A plot showing plot distribution along target RNA sequence
-plot_final_probes(probe_details, "Tm")
+plot_final_probes(probe_details, candidate_probes, "Tm", target_name) +
+  geom_hline(yintercept = as_tibble(str_locate_all(target, pattern = "N")[[1]]) %>% pull(start),
+               colour = "gray80")
 ggsave(paste0(output_dir, target_name, "_", "HCR", b_identifier, "_probes.pdf"), 
        width = 7, height = 4)
   
