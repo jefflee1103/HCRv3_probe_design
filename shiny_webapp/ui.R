@@ -147,9 +147,23 @@ ui <- navbarPage(
            )
   ),
   
-  # --- Tab 3: FLARIM (Placeholder) ---
-  tabPanel("FLARIM"),
+  # --- Tab 3: FLARIM ---
+  tabPanel("FLARIM",
+           fluidRow(
+             column(width = 8, offset = 2,
+                    h4("Coming SOON!") 
+             )
+           )
+  ),
+  
+  
   
   # --- Tab 4: Contact (Placeholder) ---
-  tabPanel("Contact")
+  tabPanel("Contact",
+           fluidRow(
+             column(width = 8, offset = 2,
+                    h4("jeff.lee{at}glasgow.ac.uk") 
+             )
+           )
+  )
 )
