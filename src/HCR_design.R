@@ -1,5 +1,4 @@
 library(tidyverse) 
-library(furrr) 
 library(patchwork) 
 library(valr) 
 library(Biostrings)
@@ -348,8 +347,8 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
   blast_output <- blast_nucleotide_to_nucleotide(
     query = temp_fasta_path,
     subject = db,
-    evalue = 10,
-    task = "blastn-short",
+    evalue = 1,
+    task = "blastn",
     strand = "plus",
     cores = cores,
     output.path = tempdir()
@@ -366,6 +365,43 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
   
   return(blast_output)
 }
+
+run_blastn <- function(df, db, tx2gene, cores = n_threads, task){
+  # Read the provided tx2gene mapping file
+  tx2gene_df <- read_csv(tx2gene)
+  
+  # Prepare the query sequences in a temporary FASTA file
+  candidates <- df
+  seqs <- DNAStringSet(candidates$target_sequence)
+  names(seqs) <- candidates$unique_id
+  
+  temp_fasta_path <- file.path(tempdir(), "query.fasta")
+  Biostrings::writeXStringSet(seqs, temp_fasta_path, format = "fasta")
+  
+  # Execute the blastn-short command using the metablastr package
+  blast_output <- blast_nucleotide_to_nucleotide(
+    query = temp_fasta_path,
+    subject = db,
+    evalue = 1,
+    task = task,
+    strand = "plus",
+    cores = cores,
+    output.path = tempdir()
+  )
+  
+  # Process and annotate the BLAST output
+  blast_output <- blast_output %>%
+    filter(bit_score > 32) %>%
+    tidyr::separate(col = subject_id, into = c("subject_id", "is_intron"), sep = "_") %>%
+    mutate(subject_id = str_replace(subject_id, "\\..*", "")) %>%
+    left_join(tx2gene_df, by = c("subject_id" = "tx_id")) %>%
+    dplyr::select(query_id, subject_id, gene_id, gene_name, everything()) %>%
+    mutate(gene_id = if_else(str_detect(subject_id, "FBgn|ENS"), subject_id, gene_id))
+  
+  return(blast_output)
+}
+
+
 
 
 
@@ -877,49 +913,49 @@ find_optimal_probe_set_dp <- function(probes_df, probe_spacing) {
   return(probes_df[selected_indices, ])
 }
 
-#' Distribute Probes Across Overlapping Regions using Dynamic Programming
-#'
-#' This function takes all candidate probes, identifies contiguous regions of
-#' overlapping probes, and then uses a dynamic programming approach to find the
-#' optimal non-overlapping set for each region.
-#'
-#' @param candidate_probes_screened A dataframe of all candidate probes that passed previous filters.
-#' @param merge_df A dataframe of merged genomic intervals from `valr::bed_merge`.
-#' @param probe_spacing The minimum number of nucleotides between probes.
-#' @return A tibble containing the final, globally optimal set of non-overlapping probes.
-
-distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, probe_spacing){
-  
-  # Use bed_intersect to assign each probe to its corresponding merged region
-  probes_in_regions <- candidate_probes_screened %>%
-    valr::bed_intersect(merge_df) %>%
-    # Create a unique ID for each merged region to group by
-    mutate(region_id = paste(start.y, end.y, sep="-")) %>%
-    # Clean up column names after the intersect operation
-    dplyr::select(
-      -contains(".y"),
-      -contains(".overlap")
-    ) %>%
-    dplyr::rename_with(~ str_replace_all(.x, ".x", ""))
-  
-  # Split the dataframe into a list of dataframes, one for each region.
-  # This prepares the data for parallel processing.
-  probes_by_region <- probes_in_regions %>%
-    group_by(region_id) %>%
-    group_split()
-  
-  # Use furrr to apply the DP function to each region in parallel.
-  # This significantly speeds up the process if there are many distinct regions.
-  optimal_probes_list <- furrr::future_map(
-    probes_by_region,
-    ~ find_optimal_probe_set_dp(.x, probe_spacing)
-  )
-  
-  # Combine the lists of optimal probes from each region into a single dataframe.
-  final_probes <- bind_rows(optimal_probes_list)
-  
-  return(final_probes)
-}
+#' #' Distribute Probes Across Overlapping Regions using Dynamic Programming
+#' #'
+#' #' This function takes all candidate probes, identifies contiguous regions of
+#' #' overlapping probes, and then uses a dynamic programming approach to find the
+#' #' optimal non-overlapping set for each region.
+#' #'
+#' #' @param candidate_probes_screened A dataframe of all candidate probes that passed previous filters.
+#' #' @param merge_df A dataframe of merged genomic intervals from `valr::bed_merge`.
+#' #' @param probe_spacing The minimum number of nucleotides between probes.
+#' #' @return A tibble containing the final, globally optimal set of non-overlapping probes.
+#' 
+#' distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, probe_spacing){
+#'   
+#'   # Use bed_intersect to assign each probe to its corresponding merged region
+#'   probes_in_regions <- candidate_probes_screened %>%
+#'     valr::bed_intersect(merge_df) %>%
+#'     # Create a unique ID for each merged region to group by
+#'     mutate(region_id = paste(start.y, end.y, sep="-")) %>%
+#'     # Clean up column names after the intersect operation
+#'     dplyr::select(
+#'       -contains(".y"),
+#'       -contains(".overlap")
+#'     ) %>%
+#'     dplyr::rename_with(~ str_replace_all(.x, ".x", ""))
+#'   
+#'   # Split the dataframe into a list of dataframes, one for each region.
+#'   # This prepares the data for parallel processing.
+#'   probes_by_region <- probes_in_regions %>%
+#'     group_by(region_id) %>%
+#'     group_split()
+#'   
+#'   # Use furrr to apply the DP function to each region in parallel.
+#'   # This significantly speeds up the process if there are many distinct regions.
+#'   optimal_probes_list <- furrr::future_map(
+#'     probes_by_region,
+#'     ~ find_optimal_probe_set_dp(.x, probe_spacing)
+#'   )
+#'   
+#'   # Combine the lists of optimal probes from each region into a single dataframe.
+#'   final_probes <- bind_rows(optimal_probes_list)
+#'   
+#'   return(final_probes)
+#' }
 
 #' Distribute Probes Across Overlapping Regions using Dynamic Programming
 #'

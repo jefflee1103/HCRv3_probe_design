@@ -10,8 +10,8 @@ library(shinythemes) # To make the app look nice
 library(tidyverse)
 library(patchwork)
 
-# For multi-threading
-library(furrr) 
+# # For multi-threading
+# library(furrr) # not in use, replaced by C++ functions
 
 # For interactive tables
 library(DT)

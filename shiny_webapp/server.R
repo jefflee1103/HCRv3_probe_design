@@ -238,7 +238,7 @@ server <- function(input, output, session) {
     
     tryCatch({
       # Run BLAST search using the filtered probes as a query
-      blast_output <- run_blastn_short(df = thermo_filtered_probes(), db = input$blast_db_path, tx2gene = input$tx2gene_path, cores = input$n_threads)
+      blast_output <- run_blastn(df = thermo_filtered_probes(), db = input$blast_db_path, tx2gene = input$tx2gene_path, cores = input$n_threads, task = "blastn")
       blast_results(blast_output)
       
       # Summarize the raw BLAST output to count off-target hits per probe
@@ -248,7 +248,7 @@ server <- function(input, output, session) {
       # Create a histogram of the number of BLAST matches
       summary_hist <- ggplot(summary_data, aes(x = n_matches)) + 
         geom_histogram(binwidth = 1, fill = "royalblue3", alpha = 0.7, colour = "black") + 
-        labs(title = "Distribution of BLAST Matches per Probe", x = "Number of Matches", y = "Probe Count") + 
+        labs(title = "Frequency distribution of BLAST Matches per Probe", x = "Number of Matches", y = "Probe Count") + 
         scale_x_continuous(breaks = scales::breaks_width(1)) +
         theme_minimal()
       blast_summary_plot(summary_hist)
@@ -337,7 +337,7 @@ server <- function(input, output, session) {
     showNotification("Configuring final probe set...", id = "probe_config", type = "message")
     
     tryCatch({
-      plan(multisession, workers = input$n_threads) # Use parallel processing
+      # plan(multisession, workers = input$n_threads) # Use parallel processing
       
       # Resolve overlaps to ensure probes are spaced correctly
       screened_probes_list <- blast_screened_probes()
@@ -347,7 +347,7 @@ server <- function(input, output, session) {
       
       # Cull the probe set down to the maximum number requested by the user
       culled_probes <- cull_excess_pairs(distributed_probes, input$num_probes)
-      plan(sequential)
+      # plan(sequential)
       
       # Attach the HCR initiator sequences to the final probes
       final_probes_with_initiators <- attach_hcr_initiatior(
@@ -366,7 +366,7 @@ server <- function(input, output, session) {
       updateTabsetPanel(session, "results_tabs", selected = "Final HCR Probes")
       
     }, error = function(e) {
-      plan(sequential)
+      # plan(sequential)
       removeNotification("probe_config")
       showNotification(paste("Configuration Error:", e$message), type = "error", duration = 10)
     })

@@ -33,7 +33,7 @@ Please see user manual PDF file for a detailed guide.
 
     ```R
     # Install packages from CRAN
-    install.packages(c("tidyverse", "shiny", "shinyFiles", "patchwork", "furrr", "DT", "Rcpp", "scales", "valr"))
+    install.packages(c("tidyverse", "shiny", "shinythemes", "patchwork", "DT", "Rcpp", "scales", "valr"))
 
     # Install packages from Bioconductor
     if (!require("BiocManager", quietly = TRUE))
@@ -53,7 +53,7 @@ Please see user manual PDF file for a detailed guide.
     Sys.which("blastn") # should say sth like "/usr/local/ncbi/blast/bin/blastn" 
     ```
 4. **Prepare BLAST database and Tx2gene file**:
-    BLAST is used to filter out probes potentially cross-hybridising with non-intended RNA targets. Prepare species-specific transcriptome BLAST databases (unzipped `.fa` or `.fasta`) and Tx2gene file, which is used to map `transcrip_id`s (used in BLAST) to `gene_id`s. *Drosophila melanogaster* BLAST database based on ENSEMBL v99 is provided in this repo. See [Zenodo publication](https://zenodo.org/doi/10.5281/zenodo.10491693) for Human and Mouse databases.  
+    BLAST is used to filter out probes potentially cross-hybridising with non-intended RNA targets. Prepare species-specific transcriptome BLAST databases (unzipped `.fa` or `.fasta`) and Tx2gene file, which is used to map `transcript_id`s (used in BLAST) to `gene_id`s. *Drosophila melanogaster* BLAST database based on ENSEMBL v99 is provided in this repo. See [Zenodo publication](https://zenodo.org/doi/10.5281/zenodo.10491693) for Human and Mouse databases.  
 
     To design probes for other species, you will need to build a custom BLAST database. A Python script and instructions for this are provided in the `scripts/custom_blast_databases/` directory.
 

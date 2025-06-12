@@ -18,7 +18,6 @@ Requires installation of blastn (see README.md).
 ## ---- R packages 
 library(tidyverse) 
 library(Rcpp)
-library(furrr) 
 library(patchwork) 
 library(valr) 
 library(Biostrings) # Bioconductor
@@ -28,9 +27,9 @@ library(metablastr) # Github
 source("./src/HCR_design.R")
 Sys.which("blastn") # check R can find the BLAST installation
 
-## ---- Set up multi-threading to speed up some calculation
+## ---- Set up multi-threading to speed up BLAST
 n_threads <- 4
-plan(multisession, workers = n_threads) 
+# plan(multisession, workers = n_threads) 
 
 ```
 
@@ -46,8 +45,8 @@ Alternatively, assign target sequence (character class) to 'target_raw'.
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/POLR1A_Homo_sapiens.fasta" 
-target_name <- "polr1a"
+fasta_file <- "./input/Dmel_cip4-exon.fa" 
+target_name <- "cip4_exon"
 
 ## ---- Get target RNA sequence
 target_fasta <- readBStringSet(fasta_file)
@@ -132,13 +131,13 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
 ## ---- Set params
-blast_file <- "~/Documents/Data/BLAST/Hsap/Hsap_BLASTdb_ens99.fa"
-tx2gene_csv <- "./data/BLAST/tx2gene/Hsap_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+blast_file <- "~/Documents/Data/BLAST/Dmel/Dmel_BLASTdb_ens99.fa"
+tx2gene_csv <- "./data/BLAST/tx2gene/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 evalue_cutoff <- 0.1 # smaller the value the more lenient
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
 ## ---- BLAST nucleotide (this bit takes time)
-blast_output <- run_blastn_short(df = candidate_probes_filtered, db = blast_file, tx2gene = tx2gene_csv)
+blast_output <- run_blastn(df = candidate_probes_filtered, db = blast_file, tx2gene = tx2gene_csv, task = "blastn")
 
 ## ---- Choose BLAST threshold
 max_blast_matches <- 1 # Max number of BLAST hits
