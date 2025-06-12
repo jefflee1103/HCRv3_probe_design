@@ -4,7 +4,11 @@ library(patchwork)
 library(valr) 
 library(Biostrings)
 library(metablastr)
+library(Rcpp)
 oligo_length <- 52
+
+sourceCpp("./src/thermo_calc.cpp")
+sourceCpp("./src/find_optimal_probe_set_dp_cpp.cpp")
 
 clean_pasted_seq <- function(sequence){
   sequence %>%
@@ -424,7 +428,7 @@ screen_with_blast_summary <- function(candidate_probes_filtered, max_blast_match
   }
 }
 
-plot_inspection <- function(df, all_candidates, colour_param){
+plot_inspection <- function(df, all_candidates, colour_param, target_name){
   plot <- ggplot(df) +
     geom_linerange(
       aes(x = " ",
@@ -435,7 +439,7 @@ plot_inspection <- function(df, all_candidates, colour_param){
     coord_flip() + 
     labs(title = "Probe positions along the target RNA sequence",
          subtitle = paste0(nrow(df), " potentially overlapping probes"),
-         x = "", y = "") +
+         x = "", y = paste0(target_name, " RNA sequence position (nt)")) +
     scale_colour_viridis_c(option = "inferno") + 
     scale_y_continuous(limits = c(0, max(all_candidates$end))) +
     annotate(geom = "rect", xmin = 0.5, xmax = 0.54, ymin = 0, ymax = max(all_candidates$end), fill = "gray80") + 
@@ -917,6 +921,49 @@ distribute_overlapping_probes <- function(candidate_probes_screened, merge_df, p
   return(final_probes)
 }
 
+#' Distribute Probes Across Overlapping Regions using Dynamic Programming
+#'
+#' This function takes all candidate probes, identifies contiguous regions of
+#' overlapping probes, and then uses a dynamic programming approach to find the
+#' optimal non-overlapping set for each region. It now calls the fast C++
+#' implementation.
+#'
+#' @param candidate_probes_screened A dataframe of all candidate probes that passed previous filters.
+#' @param merge_df A dataframe of merged genomic intervals from `valr::bed_merge`.
+#' @param probe_spacing The minimum number of nucleotides between probes.
+#' @return A tibble containing the final, globally optimal set of non-overlapping probes.
+distribute_overlapping_probes_cpp <- function(candidate_probes_screened, merge_df, probe_spacing){
+  
+  # Use bed_intersect to assign each probe to its corresponding merged region
+  probes_in_regions <- candidate_probes_screened %>%
+    valr::bed_intersect(merge_df) %>%
+    # Create a unique ID for each merged region to group by
+    mutate(region_id = paste(start.y, end.y, sep="-")) %>%
+    # Clean up column names after the intersect operation
+    dplyr::select(
+      -contains(".y"),
+      -contains(".overlap")
+    ) %>%
+    dplyr::rename_with(~ str_replace_all(.x, ".x", ""))
+  
+  # Split the dataframe into a list of dataframes, one for each region.
+  # This prepares the data for parallel processing.
+  probes_by_region <- probes_in_regions %>%
+    group_by(region_id) %>%
+    group_split()
+  
+  # Not using furrr future functions (incompatible).
+  optimal_probes_list <- map(
+    probes_by_region,
+    ~ find_optimal_probe_set_dp_cpp(.x, probe_spacing) 
+  )
+  
+  # Combine the lists of optimal probes from each region into a single dataframe.
+  final_probes <- bind_rows(optimal_probes_list) %>% as_tibble()
+  
+  return(final_probes)
+}
+
 cull_excess_pairs <- function(df, max_probe_pairs = max_probe_pairs){
   if(nrow(df) <= max_probe_pairs){
     print("Designed probe pairs are less than the max probe pairs parameter. No change applied.")
@@ -927,6 +974,7 @@ cull_excess_pairs <- function(df, max_probe_pairs = max_probe_pairs){
       slice_head(n = 33)
   }
 } 
+
 
 # attach_hcr_initiatior <- function(candidate_probes_final, b_identifier){
 #   # Mutate 1st/2nd split sequences

@@ -343,7 +343,7 @@ server <- function(input, output, session) {
       screened_probes_list <- blast_screened_probes()
       candidate_probes_screened <- screened_probes_list[[1]]
       merge_df <- screened_probes_list[[2]]
-      distributed_probes <- distribute_overlapping_probes(candidate_probes_screened, merge_df, input$probe_spacing)
+      distributed_probes <- distribute_overlapping_probes_cpp(candidate_probes_screened, merge_df, input$probe_spacing)
       
       # Cull the probe set down to the maximum number requested by the user
       culled_probes <- cull_excess_pairs(distributed_probes, input$num_probes)
@@ -358,7 +358,7 @@ server <- function(input, output, session) {
       final_probe_set(final_probes_with_initiators)
       
       # Generate the final probe map plot
-      map_plot <- plot_final_probes(df = culled_probes, all_candidates = candidate_probes(), colour_param = "dG", target_name = input$target_name)
+      map_plot <- plot_final_probes(df = culled_probes, all_candidates = candidate_probes(), colour_param = "Tm", target_name = input$target_name)
       probe_map_plot(map_plot)
       
       removeNotification("probe_config")

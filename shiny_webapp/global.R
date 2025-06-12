@@ -29,3 +29,4 @@ source("../src/HCR_design_shiny.R")
 
 # Source the C++ functions
 sourceCpp("../src/thermo_calc.cpp")
+sourceCpp("../src/find_optimal_probe_set_dp_cpp.cpp")

@@ -26,7 +26,6 @@ library(metablastr) # Github
 
 ## ---- Load functions
 source("./src/HCR_design.R")
-sourceCpp("./src/thermo_calc.cpp")
 Sys.which("blastn") # check R can find the BLAST installation
 
 ## ---- Set up multi-threading to speed up some calculation
@@ -47,8 +46,8 @@ Alternatively, assign target sequence (character class) to 'target_raw'.
 
 ```{r}
 ## ---- Input FASTA and name
-fasta_file <- "./input/Dmel_pros-RL_exon_cleaned.fa" 
-target_name <- "cip4-exon"
+fasta_file <- "./input/POLR1A_Homo_sapiens.fasta" 
+target_name <- "polr1a"
 
 ## ---- Get target RNA sequence
 target_fasta <- readBStringSet(fasta_file)
@@ -112,7 +111,7 @@ dG_range <- c(-100, -60)
 Tm_range <- c(60, 90)
 GC_range <- c(0.4, 0.6)
 pass_a_comp       <- TRUE
-pass_c_comp       <- FALSE # stringent one
+pass_c_comp       <- TRUE # stringent one
 pass_a_stack      <- TRUE
 pass_c_stack      <- TRUE
 pass_c_spec_stack <- TRUE # stringent one
@@ -121,7 +120,7 @@ pass_c_spec_stack <- TRUE # stringent one
 candidate_probes_filtered <- filter_candidate_probes(candidate_probes_annotated)
 
 ## ---- Inspect filtered probes
-plot_inspection(candidate_probes_filtered, candidate_probes, "Tm")
+plot_inspection(candidate_probes_filtered, candidate_probes, "Tm", target_name)
 
 ```
 
@@ -133,8 +132,8 @@ RMBLAST or Bowtie1? Instead of bowtie2?
 
 ```{r}
 ## ---- Set params
-blast_file <- "~/Documents/Data/BLAST/Dmel/Dmel_BLASTdb_ens99.fa"
-tx2gene_csv <- "./data/BLAST/tx2gene/Dmel_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
+blast_file <- "~/Documents/Data/BLAST/Hsap/Hsap_BLASTdb_ens99.fa"
+tx2gene_csv <- "./data/BLAST/tx2gene/Hsap_tx2gene_ENSEMBL_v99.csv" # To convert tx_id to gene_id
 evalue_cutoff <- 0.1 # smaller the value the more lenient
 allowOverlapBreakRegion <- TRUE # Allow overlap over the 25/25 break region?
 
@@ -154,7 +153,7 @@ blast_screened <- screen_with_blast_summary(candidate_probes_filtered, max_blast
 candidate_probes_screened <- blast_screened[[1]]
 merge_df <- blast_screened[[2]]
 
-plot_inspection(candidate_probes_screened, candidate_probes, "Tm") +
+plot_inspection(candidate_probes_screened, candidate_probes, "Tm", target_name) +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
       colour = "gray40", size = 2,
@@ -167,14 +166,23 @@ plot_inspection(candidate_probes_screened, candidate_probes, "Tm") +
 ```{r}
 ## ---- Set params
 probe_spacing <- 3
-max_probe_pairs <- 30 # 33 is max pair count for IDT oPools cheap configuration
+max_probe_pairs <- 33 # 33 is max pair count for IDT oPools cheap configuration
 
 ## ---- Get final non-overlapping screened candidate probes 
-candidate_probes_final <- distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing)
+# candidate_probes_final <- distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing)
+candidate_probes_final <- distribute_overlapping_probes_cpp(candidate_probes_screened, merge_df, probe_spacing)
+
+# benchmark_result <- microbenchmark::microbenchmark(
+#   R_function = distribute_overlapping_probes(candidate_probes_screened, merge_df, probe_spacing),
+#   Cpp_function = distribute_overlapping_probes_cpp(candidate_probes_screened, merge_df, probe_spacing)
+# )
+# autoplot(benchmark_result)
+# waldo::compare(candidate_probes_final, candidate_probes_final_cpp)
+
 candidate_probes_final <- cull_excess_pairs(candidate_probes_final, max_probe_pairs)
 
 ## ---- Inspect
-plot_inspection(candidate_probes_final, candidate_probes, "Tm") +
+plot_inspection(candidate_probes_final, candidate_probes, "Tm", target_name) +
   geom_linerange(data = merge_df, 
       aes(x = "", ymin = start, ymax = end),
       colour = "gray40", size = 2,
