@@ -36,7 +36,7 @@ A Conda environment file, `environment.yml`, is provided in the `scripts/custom_
 2.  Create and activate the Conda environment:
     ```bash  
     conda env create -f environment.yml
-    conda activate hcr-blast-db
+    conda activate hcr_custom_blast_db
     ```
 
 ## 3. Data Acquisition
@@ -54,7 +54,7 @@ For example, for *Saccharomyces cerevisiae* from Ensembl release 114, you would 
 
 ## 4. Usage
 
-With the `hcr-blast-db` Conda environment activated, run the script from the command line, providing the URLs you collected.
+With the `hcr_custom_blast_db` Conda environment activated, run the script from the command line, providing the URLs you collected.
 
 ### Command Structure
 

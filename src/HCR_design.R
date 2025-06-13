@@ -347,7 +347,7 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
   blast_output <- blast_nucleotide_to_nucleotide(
     query = temp_fasta_path,
     subject = db,
-    evalue = 1,
+    evalue = 10,
     task = "blastn",
     strand = "plus",
     cores = cores,
@@ -382,7 +382,7 @@ run_blastn <- function(df, db, tx2gene, cores = n_threads, task){
   blast_output <- blast_nucleotide_to_nucleotide(
     query = temp_fasta_path,
     subject = db,
-    evalue = 1,
+    evalue = 10,
     task = task,
     strand = "plus",
     cores = cores,

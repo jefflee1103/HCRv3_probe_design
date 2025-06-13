@@ -30,9 +30,9 @@ Click **"Run Thermo Filter"** to apply your selections.
 
 This step screens the remaining probes for potential off-target binding.
 
-1.  **Path to BLAST Database**: Provide the full file path to your local BLAST database (e.g., a genome or transcriptome).
+1.  **Path to BLAST Database**: Provide the full file path to your local BLAST database (e.g., a genome or transcriptome). In Windows, it's preferable to place the BLASTdb within this projec folder and paste in their relative path (e.g. `../data/BLAST/<yourBLASTdb.fa>`)
 2.  **Path to Tx2gene map**: Provide the path to a CSV file that maps transcript IDs to gene IDs. This is used to properly attribute BLAST hits.
-3.  **BLAST E-value Cutoff**: Set the expectation value cutoff for BLAST hits. Lower values are more stringent.
+3.  **BLAST E-value Cutoff**: Set the expectation value cutoff for BLAST hits. This is the value used to consider how sensitive your candidate probe might hybridise to off-targets. Increase this value if you'd like to find sensitive off-targets. 
 
 Click **"Run BLAST"** to begin the search. This may take a considerable amount of time depending on the size of your database and the number of probes.
 

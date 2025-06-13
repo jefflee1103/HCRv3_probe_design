@@ -53,9 +53,22 @@ Please see user manual PDF file for a detailed guide.
     Sys.which("blastn") # should say sth like "/usr/local/ncbi/blast/bin/blastn" 
     ```
 4. **Prepare BLAST database and Tx2gene file**:
-    BLAST is used to filter out probes potentially cross-hybridising with non-intended RNA targets. Prepare species-specific transcriptome BLAST databases (unzipped `.fa` or `.fasta`) and Tx2gene file, which is used to map `transcript_id`s (used in BLAST) to `gene_id`s. *Drosophila melanogaster* BLAST database based on ENSEMBL v99 is provided in this repo. See [Zenodo publication](https://zenodo.org/doi/10.5281/zenodo.10491693) for Human and Mouse databases.  
+    BLAST is used to filter out probes potentially cross-hybridising with non-intended RNA targets. Prepare species-specific transcriptome BLAST databases (unzipped `.fa` or `.fasta`) and Tx2gene file, which is used to map `transcript_id`s (used in BLAST) to `gene_id`s. *Drosophila melanogaster* BLAST database based on ENSEMBL v99 is provided in this repo. *D.mel*, *C.ele* and *S.cer* databases are small and included in this repo under `data/BLAST/`.  
 
-    To design probes for other species, you will need to build a custom BLAST database. A Python script and instructions for this are provided in the `scripts/custom_blast_databases/` directory.
+    | Name | Species name          | Ensembl Release | BLASTdb                 |
+    | :---------- | :----------------------- | :-------------- | :----------------------------------------- |
+    | Fruit Fly   | *Drosophila melanogaster*|  99             | `Dmel_BLASTdb_ens99.fa.gz`|
+    | Human       | *Homo sapiens* | 99             |   [Zenodo link](https://zenodo.org/records/15658381/files/Hsap_BLASTdb_ens99.fa.gz?download=1)              |
+    | Mouse       | *Mus musculus* |  99             |   [Zenodo link](https://zenodo.org/records/15658381/files/Mmus_BLASTdb_ens99.fa.gz?download=1)               |
+    | Zebrafish   | *Danio rerio* |  114             |  [Zenodo link](https://zenodo.org/records/15658381/files/Drer_BLASTdb_ens114.fa.gz?download=1)              |
+    | Frog   | *Xenopus tropicalis* |  114             |  [Zenodo link](https://zenodo.org/records/15658381/files/Xtro_BLASTdb_ens114.fa.gz?download=1)              |
+    | Chicken   | *Gallus gallus* |  114             |  [Zenodo link](https://zenodo.org/records/15658381/files/Ggal_BLASTdb_ens114.fa.gz?download=1)              |
+    | Yeast       | *Saccharomyces cerevisiae*|  114             | `Scer_BLASTdb_ens114.fa.gz`     |
+    | Worm         | *Caenorhabditis elegans* | 114             | `Cele_BLASTdb_ens114.fa.gz`  |
+    
+
+    
+    For larger transcriptomes, see [Zenodo database](https://zenodo.org/records/15658381) for BLASTdb files. **Please unzip** them before use. Tx2gene for the above species are already included in this repo `data/BLAST/tx2gene/`. To design probes for other species, a custom BLAST database can be easily built. A Python script and instructions for this are provided in `scripts/custom_blast_databases/`.
 
 ---
 
