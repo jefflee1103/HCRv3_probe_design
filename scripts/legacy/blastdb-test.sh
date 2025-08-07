@@ -202,11 +202,11 @@ python build_custom_blast_db.py \
   --flanking-nt      40
 
 python build_custom_blast_db.py \
-  --genome-fasta-url  \
-  --cdna-fasta-url    \
-  --ncrna-fasta-url   \
-  --gtf-url           \
-  --output-dir       ~/Desktop/Ecoli61 \
+  --genome-fasta-url https://ftp.ensembl.org/pub/release-114/fasta/canis_lupus_familiaris/dna/Canis_lupus_familiaris.ROS_Cfam_1.0.dna.toplevel.fa.gz \
+  --cdna-fasta-url   https://ftp.ensembl.org/pub/release-114/fasta/canis_lupus_familiaris/cdna/Canis_lupus_familiaris.ROS_Cfam_1.0.cdna.all.fa.gz \
+  --ncrna-fasta-url  https://ftp.ensembl.org/pub/release-114/fasta/canis_lupus_familiaris/ncrna/Canis_lupus_familiaris.ROS_Cfam_1.0.ncrna.fa.gz \
+  --gtf-url          https://ftp.ensembl.org/pub/release-114/gtf/canis_lupus_familiaris/Canis_lupus_familiaris.ROS_Cfam_1.0.114.gtf.gz \
+  --output-dir       ~/Desktop/Clup114 \
   --flanking-nt      40
 
 python build_custom_blast_db.py \

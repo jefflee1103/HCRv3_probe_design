@@ -334,6 +334,11 @@ filter_candidate_probes <- function(annotated_df){
 run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
   # Read the provided tx2gene mapping file
   tx2gene_df <- read_csv(tx2gene)
+  tx2gene_mapper_only <- tx2gene_df %>% 
+    dplyr::select(tx_id, gene_id)
+  tx2gene_genename <- tx2gene_df %>%
+    dplyr::select(gene_id, gene_name, gene_biotype) %>%
+    distinct()
   
   # Prepare the query sequences in a temporary FASTA file
   candidates <- df
@@ -355,13 +360,23 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
   )
   
   # Process and annotate the BLAST output
-  blast_output <- blast_output %>%
+  # blast_output <- blast_output %>%
+  #   filter(bit_score > 32) %>%
+  #   tidyr::separate(col = subject_id, into = c("subject_id", "is_intron"), sep = "_") %>%
+  #   mutate(subject_id = str_replace(subject_id, "\\..*", "")) %>%
+  #   left_join(tx2gene_df, by = c("subject_id" = "tx_id")) %>%
+  #   dplyr::select(query_id, subject_id, gene_id, gene_name, everything()) %>%
+  #   mutate(gene_id = if_else(str_detect(subject_id, "FBgn|ENS"), subject_id, gene_id))
+
+    blast_output <- blast_output %>%
     filter(bit_score > 32) %>%
     tidyr::separate(col = subject_id, into = c("subject_id", "is_intron"), sep = "_") %>%
     mutate(subject_id = str_replace(subject_id, "\\..*", "")) %>%
-    left_join(tx2gene_df, by = c("subject_id" = "tx_id")) %>%
-    dplyr::select(query_id, subject_id, gene_id, gene_name, everything()) %>%
-    mutate(gene_id = if_else(str_detect(subject_id, "FBgn|ENS"), subject_id, gene_id))
+    left_join(tx2gene_mapper_only, by = c("subject_id" = "tx_id")) %>%
+    mutate(gene_id = if_else(is.na(gene_id), subject_id, gene_id)) %>%
+    left_join(tx2gene_genename) %>%
+    dplyr::select(query_id, subject_id, gene_id, gene_name, gene_biotype, everything()) %>%
+    distinct()
   
   return(blast_output)
 }
@@ -369,6 +384,11 @@ run_blastn_short <- function(df, db, tx2gene, cores = n_threads){
 run_blastn <- function(df, db, tx2gene, cores = n_threads, task){
   # Read the provided tx2gene mapping file
   tx2gene_df <- read_csv(tx2gene)
+  tx2gene_mapper_only <- tx2gene_df %>% 
+    dplyr::select(tx_id, gene_id)
+  tx2gene_genename <- tx2gene_df %>%
+    dplyr::select(gene_id, gene_name, gene_biotype) %>%
+    distinct()
   
   # Prepare the query sequences in a temporary FASTA file
   candidates <- df
@@ -390,13 +410,22 @@ run_blastn <- function(df, db, tx2gene, cores = n_threads, task){
   )
   
   # Process and annotate the BLAST output
+  # blast_output <- blast_output %>%
+  #   filter(bit_score > 32) %>%
+  #   tidyr::separate(col = subject_id, into = c("subject_id", "is_intron"), sep = "_") %>%
+  #   mutate(subject_id = str_replace(subject_id, "\\..*", "")) %>%
+  #   left_join(tx2gene_df, by = c("subject_id" = "tx_id")) %>%
+  #   dplyr::select(query_id, subject_id, gene_id, gene_name, everything()) %>%
+  #   mutate(gene_id = if_else(str_detect(subject_id, "FBgn|ENS"), subject_id, gene_id))
   blast_output <- blast_output %>%
     filter(bit_score > 32) %>%
     tidyr::separate(col = subject_id, into = c("subject_id", "is_intron"), sep = "_") %>%
     mutate(subject_id = str_replace(subject_id, "\\..*", "")) %>%
-    left_join(tx2gene_df, by = c("subject_id" = "tx_id")) %>%
-    dplyr::select(query_id, subject_id, gene_id, gene_name, everything()) %>%
-    mutate(gene_id = if_else(str_detect(subject_id, "FBgn|ENS"), subject_id, gene_id))
+    left_join(tx2gene_mapper_only, by = c("subject_id" = "tx_id")) %>%
+    mutate(gene_id = if_else(is.na(gene_id), subject_id, gene_id)) %>%
+    left_join(tx2gene_genename) %>%
+    dplyr::select(query_id, subject_id, gene_id, gene_name, gene_biotype, everything()) %>%
+    distinct()
   
   return(blast_output)
 }
